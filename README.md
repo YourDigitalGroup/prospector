@@ -27,11 +27,34 @@ There is nothing to configure to get it running. On first request it creates its
 own encryption key, and the three accounts. Then:
 
 1. Sign in as `scott@44interactive.com` with the password `44i123`.
-2. **Settings → Anthropic API** — paste an API key from `console.anthropic.com` and press
-   *Test the API key*. This is what pays for the research; nothing runs without it.
+2. **Settings → What runs the batch** — pick an engine (see below). If you pick *Anthropic API*,
+   paste a key from `console.anthropic.com` and press *Test the API key*.
 3. **Settings → Email delivery** — set the from address and send yourself a test.
 4. **Settings → Scheduling hook** — set up one of the two options below.
 5. **Change the passwords.** All three accounts ship with `44i123`.
+
+### What runs the batch
+
+The research can come from three places. The dashboard, the storage, the de-duplication, the
+scoring floor, the email and the GoHighLevel push are identical in all three cases — only the brain
+changes.
+
+| Engine | What it costs | Where the research happens |
+|---|---|---|
+| **Anthropic API** | pay per batch, needs an API key | here, with Claude, web search and web fetch |
+| **External worker** | nothing | on your own machine, against your own Ollama — see [`worker/README.md`](worker/README.md) |
+| **Manual** | nothing | you run the loop yourself and paste the brief in |
+
+An Anthropic Pro or Max subscription does **not** include API access or API credits — those are
+separate products, so the API engine needs its own key with its own billing.
+
+With **External worker** selected, the morning cron stands down (exit 0, nothing spent) and the
+worker pulls its own assignment instead. The worker authenticates with the token under
+**Settings → Batch worker**, and that panel shows when it last checked in — a Mac that went to
+sleep shows up there rather than as leads quietly not arriving.
+
+Switching engines is a settings change. Nothing about the stored leads depends on which one
+produced them.
 
 ### Making it run every morning
 
@@ -123,6 +146,11 @@ Every email address carries a confidence label from the research:
 a sequence cannot fire at an unverified address and burn the sending domain. The address is put in
 the contact note instead, flagged, for a human to confirm.
 
+Steps 1, 4 and 5 are the same whichever engine is running. With the external worker, steps 2 and 3
+happen on your machine and the finished rows arrive over `/api/import`, where the score floor and
+the de-duplication are applied again — a buggy or over-eager worker cannot lower the bar. That
+worker never emits a `pattern` address at all, because it never infers one.
+
 ### Running one by hand
 
 **Batches → Run now**, or from the command line:
@@ -169,6 +197,7 @@ config.php             defaults; override per-server with config.local.php
 app/
   Prospector.php       runs a batch: prompt → research → extract → store → email
   Claude.php           Anthropic SDK wrapper (pause_turn handling, retries)
+  Api.php              /api/assignment and /api/import, for the external worker
   GoHighLevel.php      GoHighLevel API v2 client
   Leads.php            lead storage, filtering, dispositions, de-duplication
   Runs.php             batch records and the vertical/geography rotation
@@ -180,6 +209,7 @@ views/                 screens, partials, and the email template
 assets/                stylesheet, script, pickaxe mark
 bin/daily.php          CLI runner for cron
 bin/serve.php          local dev server router
+worker/                the external worker — runs on your Mac, talks to local Ollama
 storage/               database, encryption key, logs (never served, never committed)
 ```
 

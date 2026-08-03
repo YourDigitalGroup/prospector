@@ -128,6 +128,17 @@ if ($dryRun) {
     exit(0);
 }
 
+$engine = Settings::engine();
+
+if ($engine !== 'api') {
+    $say(
+        $engine === 'worker'
+            ? 'Engine is set to the external worker, which pulls its own assignment. Nothing to do here.'
+            : 'Engine is set to manual paste-in. Nothing runs on a schedule.'
+    );
+    exit(0);
+}
+
 if (Settings::anthropicKey() === '') {
     $say('ERROR: no Anthropic API key configured. Add one under Settings, or set ANTHROPIC_API_KEY.');
     exit(1);

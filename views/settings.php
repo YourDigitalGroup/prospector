@@ -30,6 +30,80 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
     <div class="grid grid-2">
         <div class="stack">
             <div class="card">
+                <div class="card-head"><h2>What runs the batch</h2></div>
+                <div class="card-body">
+                    <div class="field">
+                        <label for="engine">Engine</label>
+                        <select id="engine" name="engine">
+                            <option value="api" <?= ($settings['engine'] ?? 'api') === 'api' ? 'selected' : '' ?>>
+                                Anthropic API — Prospector does the research itself
+                            </option>
+                            <option value="worker" <?= ($settings['engine'] ?? '') === 'worker' ? 'selected' : '' ?>>
+                                External worker — another machine researches and posts results back
+                            </option>
+                            <option value="manual" <?= ($settings['engine'] ?? '') === 'manual' ? 'selected' : '' ?>>
+                                Manual — a person runs the loop and imports the result
+                            </option>
+                        </select>
+                        <div class="hint">
+                            With <strong>worker</strong> or <strong>manual</strong> selected, the morning cron does
+                            not call the paid API — so nothing is spent unless you choose the API engine.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h2>Batch worker</h2>
+                    <?php if ($workerLastSeen !== ''): ?>
+                        <span class="pill"><span class="dot <?= $workerStale ? 'warn' : 'ok' ?>"></span>
+                            <?= View::e(\Prospector\Support\Clock::relative($workerLastSeen)) ?></span>
+                    <?php else: ?>
+                        <span class="pill"><span class="dot"></span> Never checked in</span>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body">
+                    <?php if ($workerStale): ?>
+                        <div class="alert alert-warning">
+                            <?php $name = 'alert'; $size = 16; require __DIR__ . '/partials/icon.php'; ?>
+                            <div>
+                                The worker has not checked in since
+                                <?= View::e(\Prospector\Support\Clock::display($workerLastSeen)) ?>.
+                                If that machine is asleep or offline, no batches are being produced.
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="field">
+                        <label>Worker token</label>
+                        <div class="mono" style="background:var(--surface-3);padding:9px 11px;border-radius:7px;overflow-wrap:anywhere">
+                            <?= View::e($workerToken) ?>
+                        </div>
+                        <div class="hint">
+                            Goes in the worker's <code>config.json</code> as <code>worker_token</code>, alongside
+                            <code>"prospector_url": "<?= View::e(View::baseUrl()) ?>"</code>.
+                            Treat it as a credential — it can read assignments and write leads.
+                        </div>
+                    </div>
+
+                    <?php if (($settings['worker_engine'] ?? '') !== ''): ?>
+                        <dl class="kv">
+                            <dt>Last engine</dt>
+                            <dd><code><?= View::e($settings['worker_engine']) ?></code></dd>
+                            <dt>Machine</dt>
+                            <dd><?= View::e($settings['worker_label'] ?? '—') ?></dd>
+                        </dl>
+                    <?php endif; ?>
+
+                    <p class="hint">
+                        Setup instructions are in <code>worker/README.md</code>. The worker only makes outbound
+                        HTTPS calls, so nothing on its network needs to be exposed.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-head">
                     <h2>Anthropic API</h2>
                     <?php if ($secretSet('anthropic_api_key') || $envKey): ?>

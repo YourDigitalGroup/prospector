@@ -18,6 +18,7 @@ final class Settings
         'smtp_password',
         'ghl_token',
         'cron_token',
+        'worker_token',
     ];
 
     private const DEFAULTS = [
@@ -36,6 +37,11 @@ final class Settings
         'ghl_stage_id' => '',
         'ghl_auto_push' => '0',
         'cron_token' => '',
+        'worker_token' => '',
+        'engine' => 'api',
+        'worker_last_seen' => '',
+        'worker_label' => '',
+        'worker_engine' => '',
         'run_hour' => '',
         'run_minute' => '',
         'run_weekdays_only' => '',
@@ -136,12 +142,38 @@ final class Settings
 
     public static function cronToken(): string
     {
-        $token = self::get('cron_token');
+        return self::ensureToken('cron_token');
+    }
+
+    /** Shared secret for the batch worker API. */
+    public static function workerToken(): string
+    {
+        return self::ensureToken('worker_token');
+    }
+
+    private static function ensureToken(string $key): string
+    {
+        $token = self::get($key);
+
         if ($token === '') {
-            $token = bin2hex(random_bytes(20));
-            self::set('cron_token', $token);
+            $token = bin2hex(random_bytes(24));
+            self::set($key, $token);
         }
 
         return $token;
+    }
+
+    /**
+     * Which brain runs the daily batch.
+     *
+     * api    — Prospector calls the Anthropic API itself
+     * worker — an external machine does the work and posts results back
+     * manual — a person runs the loop and pastes the result in
+     */
+    public static function engine(): string
+    {
+        $engine = self::get('engine', 'api');
+
+        return in_array($engine, ['api', 'worker', 'manual'], true) ? $engine : 'api';
     }
 }

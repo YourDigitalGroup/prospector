@@ -81,6 +81,18 @@ if (!$force) {
     }
 }
 
+// Check the engine before the key: with an external worker or manual paste-in
+// selected there is nothing for this endpoint to do, and no key is needed.
+$engine = Settings::engine();
+
+if ($engine !== 'api') {
+    $lines[] = $engine === 'worker'
+        ? 'Engine is set to the external worker, which pulls its own assignment. Nothing to do here.'
+        : 'Engine is set to manual paste-in. Nothing runs on a schedule.';
+    echo implode("\n", $lines) . "\n";
+    exit;
+}
+
 if (Settings::anthropicKey() === '') {
     http_response_code(500);
     $lines[] = 'ERROR: no Anthropic API key configured. Set one under Settings.';

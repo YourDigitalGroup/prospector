@@ -8,15 +8,23 @@ declare(strict_types=1);
 
 require __DIR__ . '/app/bootstrap.php';
 
+use Prospector\Api;
 use Prospector\Auth;
 use Prospector\Http\Controller;
 use Prospector\Support\Request;
 use Prospector\Support\View;
 
-Auth::start();
-
 $path = Request::path();
 $method = Request::method();
+
+// The worker API is token-authenticated and stateless — no session, no CSRF,
+// and it must answer before any of the HTML plumbing runs.
+if (preg_match('#^/api/([a-z_]+)$#', $path, $apiMatch) === 1) {
+    Api::handle($apiMatch[1]);
+    exit;
+}
+
+Auth::start();
 
 View::share([
     'currentPath' => $path,

@@ -151,6 +151,20 @@ final class Prospector
      */
     public static function runScheduled(string $trigger = 'cron', bool $force = false): array
     {
+        // With an external worker or manual paste-in selected, Prospector must
+        // not reach for the paid API on a schedule — the worker drives instead.
+        $engine = Settings::engine();
+
+        if ($engine !== 'api') {
+            return [[
+                'user' => 'all',
+                'ok' => true,
+                'message' => $engine === 'worker'
+                    ? 'Engine is set to the external worker, which pulls its own assignment. Nothing to do here.'
+                    : 'Engine is set to manual paste-in. Nothing runs on a schedule.',
+            ]];
+        }
+
         $results = [];
 
         foreach (Users::scheduled() as $user) {

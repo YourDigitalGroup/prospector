@@ -501,6 +501,9 @@ final class Controller
             'cronUrl' => View::url('cron.php', ['token' => Settings::cronToken()]),
             'canDetach' => Background::canDetach(),
             'envKey' => is_string(getenv('ANTHROPIC_API_KEY')) && getenv('ANTHROPIC_API_KEY') !== '',
+            'workerToken' => Settings::workerToken(),
+            'workerLastSeen' => Settings::get('worker_last_seen'),
+            'workerStale' => self::workerIsStale(),
             'scheduleText' => Mailer::scheduleDescription(),
             'timezone' => Clock::timezoneName(),
         ]);
@@ -528,6 +531,9 @@ final class Controller
             'effort' => in_array(Request::input('effort'), ['low', 'medium', 'high', 'xhigh', 'max'], true)
                 ? Request::input('effort')
                 : 'high',
+            'engine' => in_array(Request::input('engine'), ['api', 'worker', 'manual'], true)
+                ? Request::input('engine')
+                : 'api',
         ];
 
         // Secrets are only written when a new value is typed, so an empty field
@@ -703,6 +709,26 @@ final class Controller
     }
 
     // ------------------------------------------------------------ helpers
+
+    /**
+     * A worker that has stopped checking in usually means the machine is asleep,
+     * which otherwise shows up only as leads quietly not arriving.
+     */
+    private static function workerIsStale(): bool
+    {
+        if (Settings::engine() !== 'worker') {
+            return false;
+        }
+
+        $seen = Settings::get('worker_last_seen');
+        if ($seen === '') {
+            return false;
+        }
+
+        $timestamp = strtotime($seen . ' UTC');
+
+        return $timestamp !== false && $timestamp < time() - 36 * 3600;
+    }
 
     /** @return array{ok: bool, message: string} */
     private static function pushLeadToGhl(int $leadId): array

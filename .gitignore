@@ -17,3 +17,9 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Worker: local config and candidate lists stay on the machine that runs it.
+/worker/config.json
+/worker/candidates-*.csv
+/worker/candidates-*.json
+/worker/worker.log

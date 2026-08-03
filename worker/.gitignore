@@ -1,0 +1,5 @@
+candidates-*.csv
+candidates-*.json
+config.json
+worker.log
+__pycache__/

@@ -1,0 +1,96 @@
+{
+  "_comment": "Copy to config.json and fill in the first two values. Everything else has a working default.",
+
+  "prospector_url": "https://prospector.example.com",
+  "worker_token": "paste from Prospector -> Settings -> Batch worker",
+
+  "ollama_url": "http://127.0.0.1:11434",
+  "model": "llama3.1:8b",
+
+  "_keep_alive_note": "How long Ollama holds this model in memory after the batch. Keep it short if the model is NOT one ask.fourge.com already uses, so the RAM is released. If it IS the same model, use 5m or longer so you are not evicting a model that service needs.",
+  "keep_alive": "60s",
+
+  "_num_ctx_note": "Prompts are deliberately short (one page at a time). 8192 is plenty and keeps memory use modest on a 16GB machine.",
+  "num_ctx": 8192,
+
+  "fetch_delay": 1.5,
+  "fetch_timeout": 20,
+  "request_timeout": 180,
+  "max_candidates": 200,
+  "max_pages_per_company": 5,
+  "worker_label": "mac-mini",
+
+  "_metros_note": "Awards the +10 'target market' point in the fit score. Add the markets you actually want.",
+  "qualifying_metros": [
+    "Sioux Falls", "Rapid City", "Aberdeen", "Brookings", "Watertown", "Mitchell", "Yankton",
+    "Fargo", "Bismarck", "Grand Forks", "Minot", "Dickinson",
+    "Rochester", "Duluth", "St. Cloud", "Mankato", "Moorhead", "Bemidji",
+    "Des Moines", "Cedar Rapids", "Sioux City", "Davenport", "Waterloo", "Dubuque", "Ames",
+    "Omaha", "Lincoln", "Grand Island", "Kearney", "Norfolk",
+    "Madison", "Green Bay", "Eau Claire", "La Crosse", "Wausau", "Appleton", "Oshkosh",
+    "Billings", "Missoula", "Bozeman", "Great Falls", "Cheyenne", "Casper"
+  ],
+
+  "_disqualify_note": "Hard disqualifier from the loop spec: groups that fulfil digital in-house. A candidate whose site mentions one of these is dropped before scoring. Match is a plain case-insensitive substring, so keep entries distinctive.",
+  "disqualify_owners": [
+    "Nexstar", "Gray Media", "Gray Television", "Sinclair Broadcast", "Scripps",
+    "TEGNA", "iHeartMedia", "iHeartRadio", "Audacy", "Cumulus Media", "Townsquare Media",
+    "Saga Communications", "Hubbard Radio", "Hubbard Broadcasting", "Gannett", "Lee Enterprises",
+    "Hearst Television", "McClatchy", "Paramount Global", "Allen Media",
+    "Caesars Entertainment", "MGM Resorts", "Boyd Gaming", "Penn Entertainment"
+  ],
+
+  "_sources_note": [
+    "Where raw candidates come from. Config-driven on purpose: public registry URLs move, and you should be able to point this at a new roster without touching code.",
+    "Verify any one of them with:  python3 prospector_worker.py --test-source NAME",
+    "",
+    "type 'file'   — a CSV or JSON list you already have. Columns: company, website, market, state. The easiest way to get a first real batch out.",
+    "type 'roster' — scrape an HTML member list. {state} in the URL is replaced with each state in today's geography. 'match' is an optional regex the link text must satisfy.",
+    "type 'json'   — a JSON API. 'path' is a dotted path to the array, 'fields' maps our names onto theirs.",
+    "",
+    "The FCC entry below is a starting point, not a verified endpoint — check it with --test-source fcc_facilities and correct the URL if the FCC has moved it."
+  ],
+
+  "sources": {
+    "my_list": {
+      "type": "file",
+      "loop": "partner",
+      "path": "candidates-partner.csv",
+      "label": "Imported list",
+      "enabled": true
+    },
+
+    "my_client_list": {
+      "type": "file",
+      "loop": "client",
+      "path": "candidates-client.csv",
+      "label": "Imported list",
+      "enabled": true
+    },
+
+    "state_broadcasters": {
+      "type": "roster",
+      "loop": "partner",
+      "url": "https://www.example-broadcasters-association.org/members",
+      "match": "(radio|broadcast|media|communications|FM|AM|TV)",
+      "label": "State broadcasters association",
+      "test_geography": "South Dakota",
+      "enabled": false
+    },
+
+    "fcc_facilities": {
+      "type": "json",
+      "loop": "partner",
+      "url": "https://publicfiles.fcc.gov/api/service/facility/search/state/{state}.json",
+      "path": "results",
+      "fields": {
+        "company": "licensee",
+        "market": "communityCity",
+        "state": "communityState"
+      },
+      "label": "FCC facility data",
+      "test_geography": "South Dakota",
+      "enabled": false
+    }
+  }
+}
