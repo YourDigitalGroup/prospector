@@ -21,5 +21,9 @@ jobs:
             **/.git/**
             **/.github/**
             **/node_modules/**
+            **/__pycache__/**
             README.md
             .gitignore
+            # The worker runs on the Mac Mini, not the web host. Copy it from
+            # the repository; there is no reason for it to sit in the docroot.
+            worker/**

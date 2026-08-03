@@ -15,7 +15,7 @@
 # Block direct access to application internals. The FTP deploy puts everything
 # in the web root, so these rules are what keeps the database, the encryption
 # key and the vendor tree out of reach.
-RedirectMatch 404 (?i)^/?(app|storage|bin|vendor|\.git|\.github)(/|$)
+RedirectMatch 404 (?i)^/?(app|storage|bin|vendor|worker|\.git|\.github)(/|$)
 RedirectMatch 404 (?i)/(composer\.(json|lock)|config(\.local)?\.php|README\.md|\.gitignore|\.env.*)$
 
 <FilesMatch "\.(sqlite|sqlite3|db|log|md|lock|yml|yaml)$">
