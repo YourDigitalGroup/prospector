@@ -1,0 +1,46 @@
+# Prospector — Apache configuration for shared hosting.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Serve real files and directories untouched (assets, cron.php).
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Everything else goes through the front controller.
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Block direct access to application internals. The FTP deploy puts everything
+# in the web root, so these rules are what keeps the database, the encryption
+# key and the vendor tree out of reach.
+RedirectMatch 404 (?i)^/?(app|storage|bin|vendor|\.git|\.github)(/|$)
+RedirectMatch 404 (?i)/(composer\.(json|lock)|config(\.local)?\.php|README\.md|\.gitignore|\.env.*)$
+
+<FilesMatch "\.(sqlite|sqlite3|db|log|md|lock|yml|yaml)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>
+
+# Batches run for minutes. Raise the limits where the host allows it.
+<IfModule mod_php.c>
+    php_value max_execution_time 900
+    php_value memory_limit 512M
+</IfModule>
+
+Options -Indexes
+DirectoryIndex index.php

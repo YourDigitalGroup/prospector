@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job for the Prospector worker.
+
+  Install:
+      cp com.44i.prospector.plist ~/Library/LaunchAgents/
+      # edit the paths below to match where you put the worker
+      launchctl load ~/Library/LaunchAgents/com.44i.prospector.plist
+
+  Check it is registered:
+      launchctl list | grep prospector
+
+  Run it once, right now, without waiting for the schedule:
+      launchctl start com.44i.prospector
+
+  Remove:
+      launchctl unload ~/Library/LaunchAgents/com.44i.prospector.plist
+
+  IMPORTANT — the Mac has to be awake at 07:30 or this never fires. Either turn
+  off sleep for this machine (System Settings -> Energy, or Displays -> Advanced
+  -> "Prevent automatic sleeping"), or schedule a wake:
+
+      sudo pmset repeat wakeorpoweron MTWRF 07:25:00
+
+  Prospector will flag a worker that stops checking in, so a sleeping Mac shows
+  up on the Settings screen rather than as leads quietly not arriving.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.44i.prospector</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <!-- Change this to wherever the worker actually lives. -->
+        <string>/Users/Shared/prospector-worker/prospector_worker.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/Shared/prospector-worker</string>
+
+    <!-- 07:30 local time, Monday to Friday. Weekday 1 is Monday. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Weekday</key><integer>1</integer>
+            <key>Hour</key><integer>7</integer>
+            <key>Minute</key><integer>30</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>2</integer>
+            <key>Hour</key><integer>7</integer>
+            <key>Minute</key><integer>30</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>3</integer>
+            <key>Hour</key><integer>7</integer>
+            <key>Minute</key><integer>30</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>4</integer>
+            <key>Hour</key><integer>7</integer>
+            <key>Minute</key><integer>30</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>5</integer>
+            <key>Hour</key><integer>7</integer>
+            <key>Minute</key><integer>30</integer>
+        </dict>
+    </array>
+
+    <!-- If the Mac was asleep at 07:30, run as soon as it wakes. -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/Shared/prospector-worker/worker.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/Shared/prospector-worker/worker.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Keep it off the other service's back: one batch at a time, low priority. -->
+    <key>Nice</key>
+    <integer>5</integer>
+    <key>LowPriorityIO</key>
+    <true/>
+</dict>
+</plist>

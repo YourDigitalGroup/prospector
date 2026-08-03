@@ -1,0 +1,3 @@
+# Nothing in storage/ is ever served. The SQLite database, the encryption key
+# and the run log all live here.
+Require all denied

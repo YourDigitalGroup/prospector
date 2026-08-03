@@ -1,0 +1,25 @@
+# Server-specific overrides — never committed, created on the host if needed.
+/config.local.php
+
+# Runtime state: database, encryption key, logs, caches.
+/storage/*.sqlite
+/storage/*.sqlite-wal
+/storage/*.sqlite-shm
+/storage/app_key.php
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/cache/*
+!/storage/cache/.gitkeep
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Worker: local config and candidate lists stay on the machine that runs it.
+/worker/config.json
+/worker/candidates-*.csv
+/worker/candidates-*.json
+/worker/worker.log

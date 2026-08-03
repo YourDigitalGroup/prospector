@@ -1,0 +1,20 @@
+{
+    "name": "yourdigitalgroup/prospector",
+    "description": "Prospector — lead generation and management for 44i",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "anthropic-ai/sdk": "^0.40",
+        "guzzlehttp/guzzle": "^7.8",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "Prospector\\": "app/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
