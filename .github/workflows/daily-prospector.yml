@@ -1,0 +1,68 @@
+name: Daily prospector batch
+
+# Pings the app's cron endpoint on the half hour. The app itself decides whether
+# it is time to run — the delivery window opens at the hour configured under
+# Settings (in America/Chicago) and stays open three hours, and a batch that has
+# already run today is skipped. That means this schedule never needs editing for
+# daylight saving or for a change to the delivery time.
+#
+# Setup: add a repository secret named PROSPECTOR_CRON_URL containing the full
+# webhook URL from Settings → Scheduling hook, including the ?token= value.
+#
+# This is the fallback path. A cPanel cron job calling bin/daily.php is the
+# better primary — it does not depend on GitHub Actions being on time.
+
+on:
+  schedule:
+    - cron: '0,30 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Run even outside the delivery window'
+        type: boolean
+        default: false
+
+concurrency:
+  group: prospector-batch
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ping the batch endpoint
+        env:
+          CRON_URL: ${{ secrets.PROSPECTOR_CRON_URL }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ -z "$CRON_URL" ]; then
+            echo "::error::PROSPECTOR_CRON_URL is not set. Add it as a repository secret."
+            exit 1
+          fi
+
+          url="$CRON_URL"
+          if [ "$FORCE" = "true" ]; then
+            case "$url" in
+              *\?*) url="${url}&force=1" ;;
+              *)    url="${url}?force=1" ;;
+            esac
+          fi
+
+          # --max-time covers hosts that cannot detach and answer synchronously.
+          # The response body is printed but the token is never echoed.
+          status=$(curl --silent --show-error --location \
+                        --max-time 900 --retry 2 --retry-delay 30 \
+                        --output response.txt --write-out '%{http_code}' \
+                        "$url") || true
+
+          echo "HTTP $status"
+          echo '--- response ---'
+          cat response.txt || true
+
+          case "$status" in
+            200|202) echo "Batch endpoint accepted the request." ;;
+            403) echo "::error::Rejected — the token in PROSPECTOR_CRON_URL is wrong."; exit 1 ;;
+            000) echo "::error::Could not reach the site."; exit 1 ;;
+            *) echo "::error::Unexpected response $status."; exit 1 ;;
+          esac
