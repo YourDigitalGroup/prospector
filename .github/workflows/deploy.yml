@@ -4,10 +4,24 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'List what would be uploaded without uploading it'
+        type: boolean
+        default: false
+
+# Two FTP deploys running at once fight over the same connection limit and the
+# same sync-state file, and the loser corrupts the winner's state. Queue them.
+concurrency:
+  group: prospector-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # A hung FTP control socket would otherwise sit here for six hours.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: SamKirkland/FTP-Deploy-Action@4.3.2
@@ -17,6 +31,28 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           local-dir: ./
+
+          # Explicit TLS on port 21. Two reasons this is not the default here:
+          # most cPanel hosts now refuse or throttle plain FTP data channels,
+          # which shows up as directories being created fine and file transfers
+          # then hanging; and plain FTP puts FTP_PASSWORD on the wire in the
+          # clear. If the host turns out to speak only implicit TLS, the value
+          # for that is `ftps-legacy` (port 990).
+          protocol: ftps
+
+          # The 30s default is the control-socket timeout, not a total budget.
+          # A shared host under load needs more than that to answer.
+          timeout: 120000
+
+          # vendor/ is ~2,000 files and every one is a separate FTP round trip.
+          # Standard logging names each file, which is what you want when a
+          # transfer stalls and you need to know where it stopped.
+          log-level: standard
+
+          dry-run: ${{ inputs.dry-run == true }}
+
+          # worker/ runs on the Mac Mini, not the web host — copy it from the
+          # repository instead. __pycache__ is its build noise.
           exclude: |
             **/.git/**
             **/.github/**
@@ -24,6 +60,4 @@ jobs:
             **/__pycache__/**
             README.md
             .gitignore
-            # The worker runs on the Mac Mini, not the web host. Copy it from
-            # the repository; there is no reason for it to sit in the docroot.
             worker/**
