@@ -130,5 +130,63 @@ final class Schema
                 }
             }
         }
+
+        // CREATE TABLE IF NOT EXISTS does nothing to a table that already
+        // exists, so columns added after a release need their own step. Keep
+        // entries here forever: they are how an already-deployed database
+        // catches up on the next request.
+        self::addColumns([
+            ['users', 'ghl_pipeline_id', 'VARCHAR(120) NULL'],
+        ]);
+    }
+
+    /**
+     * Add columns that are missing, and leave the ones that are not alone.
+     *
+     * @param list<array{0: string, 1: string, 2: string}> $columns table, column, definition
+     */
+    private static function addColumns(array $columns): void
+    {
+        foreach ($columns as [$table, $column, $definition]) {
+            if (self::hasColumn($table, $column)) {
+                continue;
+            }
+
+            try {
+                Database::pdo()->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
+            } catch (\PDOException $e) {
+                // Lost a race with another request, which is fine.
+                if (!str_contains($e->getMessage(), 'duplicate') && !str_contains($e->getMessage(), 'Duplicate')) {
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    private static function hasColumn(string $table, string $column): bool
+    {
+        if (Database::driver() === 'mysql') {
+            $row = Database::first(
+                'SELECT COUNT(*) AS n FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c',
+                ['t' => $table, 'c' => $column]
+            );
+
+            return (int) ($row['n'] ?? 0) > 0;
+        }
+
+        // PRAGMA takes no bound parameters, hence the identifier check rather
+        // than a placeholder.
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $table) !== 1) {
+            throw new \InvalidArgumentException('Refusing to inspect a table with an unexpected name.');
+        }
+
+        foreach (Database::all("PRAGMA table_info({$table})") as $info) {
+            if (($info['name'] ?? '') === $column) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

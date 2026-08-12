@@ -28,7 +28,15 @@ $nav = [
     ],
     'Pipeline' => [
         ['path' => '/runs', 'label' => 'Daily batches', 'icon' => 'zap'],
-        ['path' => '/ghl', 'label' => 'GoHighLevel', 'icon' => 'link'],
+    ],
+    // The GoHighLevel workspace. Its own group because these are the screens
+    // Billy and Darren live in once a lead is in play, not somewhere they dip
+    // into occasionally.
+    'GoHighLevel' => [
+        ['path' => '/ghl', 'label' => 'Pipeline board', 'icon' => 'link'],
+        ['path' => '/ghl/contacts', 'label' => 'Contacts', 'icon' => 'users'],
+        ['path' => '/ghl/inbox', 'label' => 'Inbox', 'icon' => 'inbox'],
+        ['path' => '/ghl/automations', 'label' => 'Automations', 'icon' => 'zap'],
     ],
 ];
 
@@ -42,6 +50,12 @@ if ($isAdmin) {
 $active = static function (string $path) use ($currentPath): bool {
     if ($path === '/dashboard') {
         return $currentPath === '/dashboard' || $currentPath === '/';
+    }
+
+    // /ghl is the board, and every other workspace screen hangs off it, so the
+    // usual prefix rule would light up the board for all of them.
+    if ($path === '/ghl') {
+        return $currentPath === '/ghl';
     }
 
     return $currentPath === $path || str_starts_with($currentPath, $path . '/');
