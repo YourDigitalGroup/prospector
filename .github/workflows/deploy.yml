@@ -32,16 +32,16 @@ jobs:
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           local-dir: ./
 
-          # Explicit TLS on port 21. Two reasons this is not the default here:
-          # most cPanel hosts now refuse or throttle plain FTP data channels,
-          # which shows up as directories being created fine and file transfers
-          # then hanging; and plain FTP puts FTP_PASSWORD on the wire in the
-          # clear. If the host turns out to speak only implicit TLS, the value
-          # for that is `ftps-legacy` (port 990).
-          protocol: ftps
+          # Left on plain FTP because that is what this host is proven to do:
+          # the first full upload took ~26 minutes but did complete. Worth
+          # revisiting — plain FTP puts FTP_PASSWORD on the wire in the clear —
+          # but only after `protocol: ftps` has been tried through the manual
+          # dry-run trigger above. Switching it blind risks breaking a deploy
+          # path that currently works. (Implicit TLS, if the host wants that
+          # instead, is `ftps-legacy` on port 990.)
 
           # The 30s default is the control-socket timeout, not a total budget.
-          # A shared host under load needs more than that to answer.
+          # Two of the first three attempts died on it while the host was busy.
           timeout: 120000
 
           # vendor/ is ~2,000 files and every one is a separate FTP round trip.
