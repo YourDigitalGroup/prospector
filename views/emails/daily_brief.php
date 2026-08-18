@@ -49,10 +49,18 @@ $accent = '#3f6212';
                 <tr>
                     <td width="30" style="vertical-align:middle;">
                         <!-- Clients that strip inline SVG just show the wordmark, which stands alone fine. -->
-                        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="#cdf565"
-                             stroke-linecap="round" style="display:block;">
-                            <path d="M11.5 4 Q 23.5 4.5 27 14.5" stroke-width="3.6"/>
-                            <path d="M5.5 27.5 L 20.5 8" stroke-width="3"/>
+                        <svg width="26" height="26" viewBox="0 0 100 100" fill="#cdf565"
+                             style="display:block;">
+                            <path d="M2.5 63 C2.5 35 21 7 50 1 L56 15.5 C29.5 22 11 41 5.5 57.5 Z"/>
+                            <path d="M97.5 63 C97.5 35 79 7 50 1 L44 15.5 C70.5 22 89 41 94.5 57.5 Z"/>
+                            <g stroke="#cdf565" stroke-linecap="butt" fill="none">
+                                <path d="M26 16 L78 95.5" stroke-width="10"/>
+                                <path d="M74 16 L22 95.5" stroke-width="10"/>
+                                <path d="M27.7 18.7 L32.9 26.9" stroke-width="14.4"/>
+                                <path d="M72.3 18.7 L67.1 26.9" stroke-width="14.4"/>
+                                <path d="M74.3 90 L77.5 94.8" stroke-width="12.8"/>
+                                <path d="M25.7 90 L22.5 94.8" stroke-width="12.8"/>
+                            </g>
                         </svg>
                     </td>
                     <td style="vertical-align:middle;padding-left:10px;">

@@ -136,4 +136,131 @@
             setTimeout(function () { window.location.reload(); }, seconds * 1000);
         }
     }
+
+    // ---- pipeline board: drag a card to another stage -------------------
+    // The card moves in the DOM first and is put back if GoHighLevel refuses,
+    // so a normal move feels instant and a failed one is obvious.
+    var board = document.querySelector('[data-board]');
+    if (board) {
+        var dragging = null;
+        var origin = null;
+
+        var recount = function () {
+            board.querySelectorAll('.board-col').forEach(function (col) {
+                var badge = col.querySelector('[data-count]');
+                if (badge) badge.textContent = col.querySelectorAll('.board-card').length;
+            });
+        };
+
+        board.addEventListener('dragstart', function (event) {
+            var card = event.target.closest('.board-card');
+            if (!card) return;
+            dragging = card;
+            origin = card.parentElement;
+            card.classList.add('is-dragging');
+            // Firefox will not start a drag without data on the transfer.
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', card.getAttribute('data-card') || '');
+            }
+        });
+
+        board.addEventListener('dragend', function () {
+            if (dragging) dragging.classList.remove('is-dragging');
+            board.querySelectorAll('[data-drop]').forEach(function (d) { d.classList.remove('is-over'); });
+            dragging = null;
+        });
+
+        board.addEventListener('dragover', function (event) {
+            var drop = event.target.closest('[data-drop]');
+            if (!drop || !dragging) return;
+            event.preventDefault();
+            drop.classList.add('is-over');
+        });
+
+        board.addEventListener('dragleave', function (event) {
+            var drop = event.target.closest('[data-drop]');
+            if (drop && !drop.contains(event.relatedTarget)) drop.classList.remove('is-over');
+        });
+
+        board.addEventListener('drop', function (event) {
+            var drop = event.target.closest('[data-drop]');
+            if (!drop || !dragging) return;
+            event.preventDefault();
+            drop.classList.remove('is-over');
+
+            var card = dragging;
+            var from = origin;
+            var column = drop.closest('.board-col');
+            if (!column || from === drop) return;
+
+            drop.appendChild(card);
+            card.classList.add('is-saving');
+            recount();
+
+            var body = new URLSearchParams();
+            body.set('csrf', board.getAttribute('data-csrf') || '');
+            body.set('opportunity_id', card.getAttribute('data-card') || '');
+            body.set('pipeline_id', board.getAttribute('data-pipeline') || '');
+            body.set('stage_id', column.getAttribute('data-stage') || '');
+
+            fetch(board.getAttribute('data-endpoint'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (response) {
+                return response.json().catch(function () { return { ok: false, message: 'Unexpected reply.' }; });
+            }).then(function (result) {
+                card.classList.remove('is-saving');
+                if (result && result.ok) return;
+                if (from) from.appendChild(card);
+                recount();
+                window.alert((result && result.message) || 'GoHighLevel would not move that deal.');
+            }).catch(function () {
+                card.classList.remove('is-saving');
+                if (from) from.appendChild(card);
+                recount();
+                window.alert('Could not reach the server. The card was put back.');
+            });
+        });
+    }
+
+    // ---- sending to a real prospect needs an explicit confirmation ------
+    var sendForm = document.querySelector('[data-send-form]');
+    if (sendForm) {
+        var typeSelect = sendForm.querySelector('[data-send-type]');
+        var subjectField = sendForm.querySelector('[data-subject-field]');
+
+        var syncType = function () {
+            if (!typeSelect || !subjectField) return;
+            subjectField.style.display = typeSelect.value === 'Email' ? '' : 'none';
+        };
+
+        if (typeSelect) typeSelect.addEventListener('change', syncType);
+        syncType();
+
+        sendForm.addEventListener('submit', function (event) {
+            var confirmField = sendForm.querySelector('[data-confirm]');
+            var bodyField = sendForm.querySelector('[name="body"]');
+            var kind = typeSelect && typeSelect.value === 'Email' ? 'email' : 'text message';
+
+            if (!bodyField || bodyField.value.trim() === '') {
+                event.preventDefault();
+                window.alert('Write the message first.');
+                return;
+            }
+
+            if (!window.confirm('Send this ' + kind + ' to the contact now? It goes out immediately.')) {
+                event.preventDefault();
+                return;
+            }
+
+            if (confirmField) confirmField.value = '1';
+        });
+    }
 })();

@@ -11,6 +11,7 @@ require __DIR__ . '/app/bootstrap.php';
 use Prospector\Api;
 use Prospector\Auth;
 use Prospector\Http\Controller;
+use Prospector\Http\Workspace;
 use Prospector\Support\Request;
 use Prospector\Support\View;
 
@@ -69,7 +70,25 @@ try {
         $path === '/runs' => Controller::runs(),
         $path === '/runs/start' && $method === 'POST' => Controller::runStart(),
 
-        $path === '/ghl' => Controller::ghl(),
+        // The GoHighLevel workspace. /ghl is the pipeline board; the old
+        // read-only summary lives on at /ghl/summary.
+        $path === '/ghl' => Workspace::board(),
+        $path === '/ghl/contacts' => Workspace::contacts(),
+        $path === '/ghl/contact' => Workspace::contact(),
+        $path === '/ghl/inbox' => Workspace::inbox(),
+        $path === '/ghl/automations' => Workspace::automations(),
+        $path === '/ghl/summary' => Controller::ghl(),
+
+        $path === '/ghl/connect' && $method === 'POST' => Workspace::connectSave(),
+        $path === '/ghl/connect' => Workspace::connect(),
+        $path === '/ghl/disconnect' && $method === 'POST' => Workspace::disconnect(),
+
+        $path === '/ghl/move' && $method === 'POST' => Workspace::move(),
+        $path === '/ghl/status' && $method === 'POST' => Workspace::status(),
+        $path === '/ghl/note' && $method === 'POST' => Workspace::note(),
+        $path === '/ghl/task' && $method === 'POST' => Workspace::task(),
+        $path === '/ghl/send' && $method === 'POST' => Workspace::send(),
+        $path === '/ghl/enroll' && $method === 'POST' => Workspace::enroll(),
 
         $path === '/settings' => Controller::settings(),
         $path === '/settings/test/anthropic' && $method === 'POST' => Controller::settingsTest('anthropic'),

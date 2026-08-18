@@ -18,6 +18,33 @@ if (!is_file($autoload)) {
 }
 require $autoload;
 
+/**
+ * Name a missing extension up front. Shared-hosting PHP builds vary more than
+ * you would expect — the first deploy landed on a host with no libsodium, and
+ * without this the symptom was an "undefined constant" 500 from deep inside the
+ * crypto layer rather than anything a person could act on.
+ *
+ * Checked by function, not extension_loaded: a few hosts load a partial build,
+ * and some disable individual functions while leaving the extension present.
+ */
+$missing = [];
+foreach (['mbstring' => 'mb_substr', 'curl' => 'curl_init'] as $extension => $probe) {
+    if (!function_exists($probe)) {
+        $missing[] = $extension;
+    }
+}
+if (!class_exists('PDO')) {
+    $missing[] = 'pdo';
+}
+if ($missing !== []) {
+    http_response_code(500);
+    exit(
+        'Prospector needs these PHP extensions, which this server does not have: '
+        . implode(', ', $missing)
+        . ". In cPanel, enable them under Select PHP Version → Extensions.\n"
+    );
+}
+
 use Prospector\Auth;
 use Prospector\Support\Clock;
 use Prospector\Support\Database;

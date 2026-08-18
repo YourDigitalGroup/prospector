@@ -168,23 +168,65 @@ spending a token.
 
 ## GoHighLevel
 
-In GoHighLevel, open **Settings → Private Integrations** on the sub-account and create an
-integration with these scopes:
+Everyone connects their own sub-account under **GoHighLevel → Connection**: a Location ID and a
+Private Integration token, stored encrypted against their user. An account-wide pair in Settings is
+the fallback for anyone who has not. Admins can view and set up anyone's with the switcher on the
+workspace header; everyone else only ever sees their own, whatever they put in the URL.
 
+Make the token in GoHighLevel under **Settings → Private Integrations**, on the sub-account rather
+than the agency view, with these scopes:
+
+| Scope | Needed for |
+|---|---|
+| `locations.readonly` | The connection test |
+| `contacts.readonly`, `contacts.write` | Contacts, notes, tasks, pushing leads |
+| `opportunities.readonly`, `opportunities.write` | The pipeline board and moving cards |
+| `conversations.readonly`, `conversations.write` | The inbox |
+| `conversations/message.readonly` | Reading a thread |
+| `conversations/message.write` | Sending email and SMS |
+| `workflows.readonly` | Listing automations |
+
+Miss one and only that panel stops working — each fetches separately and says which scope it wanted.
+
+### The workspace
+
+| Screen | What it does |
+|---|---|
+| **Pipeline board** | Opportunities as columns by stage. Drag a card to move the deal — it saves to GoHighLevel and snaps back if the API refuses. |
+| **Contacts** | Search the sub-account, open anyone. |
+| **Contact** | Notes, tasks, the conversation thread, and a compose box that sends email or SMS. Also drops the contact into a workflow. |
+| **Inbox** | Every conversation, newest activity first. |
+| **Automations** | Workflows, and a read-only view of Conversation AI agents. |
+
+Nothing is mirrored into Prospector's database — the workspace reads and writes the live
+sub-account, because a stale copy of a CRM is worse than no copy.
+
+**Sending is real.** Email and SMS from the contact screen go to the actual prospect immediately.
+The compose box names the address or number before you commit, and the send is rejected server-side
+unless the confirmation step was completed.
+
+Conversation AI is read-only on purpose: GoHighLevel's API can create and configure agents, but
+nothing documented turns a bot on or off for one contact or conversation, which is the control a rep
+would actually want mid-thread.
+
+Pushing a lead from the Leads screen upserts it as a contact — company, name, email, phone, website,
+city, tags for vertical, buyer door and fit score — and attaches the evidence and opening hook as a
+note. Fill in a Pipeline ID and Stage ID under Settings and each push also opens an opportunity.
+
+### Testing it without a GoHighLevel account
+
+`tests/mock_ghl.py` stands in for the API, holding state in memory so round trips are real — move a
+card and the next page load shows it moved. It also injects failures, which is how the
+missing-scope behaviour is checked:
+
+```bash
+python3 tests/mock_ghl.py --port 8788 &
+PROSPECTOR_GHL_BASE=http://127.0.0.1:8788 php -S 127.0.0.1:8402 -t . bin/serve.php
+curl "http://127.0.0.1:8788/__control?fail=workflows"   # that endpoint now 401s
 ```
-contacts.readonly  contacts.write  opportunities.readonly  opportunities.write  locations.readonly
-```
 
-Put the token and the Location ID into **Settings → GoHighLevel** and press *Test the connection*.
-
-Pushing a lead upserts it as a contact — company, name, email, phone, website, city, tags for
-vertical, buyer door and fit score — and attaches the evidence and opening hook as a note. Fill in
-a Pipeline ID and Stage ID as well and each push also opens an opportunity. The **GoHighLevel**
-screen reads the sub-account's contacts and opportunities back so both sides are visible in one
-place.
-
-Billy and Darren can point at their own sub-accounts: a per-user token on the Users screen takes
-priority over the account-wide one.
+`PROSPECTOR_GHL_BASE` is an environment variable and deliberately not a setting: nothing anyone
+clicks should be able to point live credentials at another host.
 
 ---
 

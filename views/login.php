@@ -30,7 +30,7 @@ use Prospector\Support\View;
 <div class="auth-wrap">
     <div class="auth-card">
         <div class="auth-brand">
-            <?php $size = 34; require __DIR__ . '/partials/logo.php'; ?>
+            <?php $size = 72; $variant = 'full'; require __DIR__ . '/partials/logo.php'; ?>
             <span><?= View::e($appName ?? 'Prospector') ?></span>
         </div>
         <p class="auth-tag">Qualified leads, dug out and delivered every morning.</p>

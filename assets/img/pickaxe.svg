@@ -1,7 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Prospector">
-  <rect width="32" height="32" rx="7" fill="#12140f"/>
-  <g fill="none" stroke="#cdf565" stroke-linecap="round" transform="translate(1.6 1.4) scale(0.9)">
-    <path d="M11.5 4 Q 23.5 4.5 27 14.5" stroke-width="3.9"/>
-    <path d="M5.5 27.5 L 20.5 8" stroke-width="3.3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Prospector">
+  <!-- Favicon: the compact mark on a dark rounded square. No mountain — at 16px
+       its peaks weld themselves to the arch and the whole thing turns to mush.
+       prospector-mark.svg alongside this is the full mark, for large use. -->
+  <rect width="128" height="128" rx="28" fill="#12140f"/>
+  <g transform="translate(14 15)" fill="#cdf565">
+    <path d="M2.5 63 C2.5 35 21 7 50 1 L56 15.5 C29.5 22 11 41 5.5 57.5 Z"/>
+    <path d="M97.5 63 C97.5 35 79 7 50 1 L44 15.5 C70.5 22 89 41 94.5 57.5 Z"/>
+    <g stroke="#cdf565" stroke-linecap="butt" fill="none">
+      <path d="M26 16 L78 95.5" stroke-width="10"/>
+      <path d="M74 16 L22 95.5" stroke-width="10"/>
+      <path d="M27.7 18.7 L32.9 26.9" stroke-width="14.4"/>
+      <path d="M72.3 18.7 L67.1 26.9" stroke-width="14.4"/>
+      <path d="M74.3 90 L77.5 94.8" stroke-width="12.8"/>
+      <path d="M25.7 90 L22.5 94.8" stroke-width="12.8"/>
+    </g>
   </g>
 </svg>

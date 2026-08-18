@@ -4,10 +4,24 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'List what would be uploaded without uploading it'
+        type: boolean
+        default: false
+
+# Two FTP deploys running at once fight over the same connection limit and the
+# same sync-state file, and the loser corrupts the winner's state. Queue them.
+concurrency:
+  group: prospector-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # A hung FTP control socket would otherwise sit here for six hours.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: SamKirkland/FTP-Deploy-Action@4.3.2
@@ -17,9 +31,33 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           local-dir: ./
+
+          # Left on plain FTP because that is what this host is proven to do:
+          # the first full upload took ~26 minutes but did complete. Worth
+          # revisiting — plain FTP puts FTP_PASSWORD on the wire in the clear —
+          # but only after `protocol: ftps` has been tried through the manual
+          # dry-run trigger above. Switching it blind risks breaking a deploy
+          # path that currently works. (Implicit TLS, if the host wants that
+          # instead, is `ftps-legacy` on port 990.)
+
+          # The 30s default is the control-socket timeout, not a total budget.
+          # Two of the first three attempts died on it while the host was busy.
+          timeout: 120000
+
+          # vendor/ is ~2,000 files and every one is a separate FTP round trip.
+          # Standard logging names each file, which is what you want when a
+          # transfer stalls and you need to know where it stopped.
+          log-level: standard
+
+          dry-run: ${{ inputs.dry-run == true }}
+
+          # worker/ runs on the Mac Mini, not the web host — copy it from the
+          # repository instead. __pycache__ is its build noise.
           exclude: |
             **/.git/**
             **/.github/**
             **/node_modules/**
+            **/__pycache__/**
             README.md
             .gitignore
+            worker/**
