@@ -46,7 +46,9 @@ try {
         } elseif ($method === 'POST') {
             Controller::leadAction($id, $action);
         } else {
-            Controller::notFound();
+            // Actions are POST-only. A GET here is someone refreshing or going
+            // back to an action URL, so show them the lead rather than a 404.
+            Controller::redirect('/leads/' . $id);
         }
         exit;
     }

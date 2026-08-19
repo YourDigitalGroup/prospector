@@ -160,6 +160,7 @@ final class Controller
     private static function renderLead(array $lead, array $extra = []): void
     {
         $id = (int) $lead['id'];
+        $digState = Leads::digState($lead);
 
         View::page('lead', array_merge([
             'title' => (string) $lead['company'],
@@ -168,9 +169,9 @@ final class Controller
             'owners' => Auth::isAdmin() ? Users::all() : [],
             'ghlReady' => GoHighLevel::forUser(Users::find((int) $lead['user_id'])) !== null,
             'run' => $lead['run_id'] !== null ? Runs::find((int) $lead['run_id']) : null,
-            'dig' => null,
-            'digMessage' => null,
-            'digOk' => true,
+            'digStatus' => $digState['status'],
+            'dig' => $digState['findings'],
+            'digMessage' => $digState['message'],
         ], $extra));
     }
 
@@ -235,21 +236,17 @@ final class Controller
                 break;
 
             case 'dig':
-                // Renders rather than redirects — the findings have to be shown
-                // and accepted before anything is written to the lead.
-                Background::extendLimits(300);
-                $dug = Enrich::dig($lead);
-
-                self::renderLead($lead, [
-                    'dig' => $dug['ok'] ? $dug['findings'] : null,
-                    'digMessage' => $dug['message'],
-                    'digOk' => $dug['ok'],
-                ]);
+                self::startDig($id, $lead);
 
                 return;
 
             case 'dig-apply':
                 self::applyDig($id, $lead);
+                Leads::clearDig($id);
+                break;
+
+            case 'dig-dismiss':
+                Leads::clearDig($id);
                 break;
 
             default:
@@ -257,6 +254,54 @@ final class Controller
         }
 
         self::redirect($back);
+    }
+
+    /**
+     * Start a dig and get out of the browser's way.
+     *
+     * A dig takes 30-60 seconds. Held open, that outlasts the request timeout on
+     * shared hosting — the connection dies, and the half-finished POST leaves
+     * the browser sitting on /leads/{id}/dig, which is a 404 on a GET. So the
+     * response goes out first and the work happens after it.
+     *
+     * @param array<string, mixed> $lead
+     */
+    private static function startDig(int $id, array $lead): never
+    {
+        Leads::startDig($id);
+
+        $back = View::url('leads/' . $id);
+
+        if (!Background::canDetach()) {
+            // No FastCGI to hand the response to, so run it inline and hope the
+            // host is patient. Still redirects, so a refresh cannot re-post.
+            Background::extendLimits(300);
+            $dug = Enrich::dig($lead);
+            Leads::finishDig($id, $dug['ok'], $dug['findings'], $dug['message']);
+            self::redirect('/leads/' . $id);
+        }
+
+        // 303 so the browser follows with a GET — the lead page then polls.
+        Background::respondThenContinue('', 303, ['Location' => $back]);
+
+        // The session lock would otherwise block every poll request for the
+        // whole dig, which would look exactly like the hang this replaces.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        Background::extendLimits(600);
+
+        try {
+            $dug = Enrich::dig($lead);
+            Leads::finishDig($id, $dug['ok'], $dug['findings'], $dug['message']);
+            Background::log('Dig for lead ' . $id . ': ' . $dug['message']);
+        } catch (\Throwable $e) {
+            Leads::finishDig($id, false, [], 'The dig failed: ' . $e->getMessage());
+            Background::log('Dig for lead ' . $id . ' failed: ' . $e->getMessage());
+        }
+
+        exit;
     }
 
     /**
@@ -803,6 +848,7 @@ final class Controller
             'canDetach' => Background::canDetach(),
             'envKey' => is_string(getenv('ANTHROPIC_API_KEY')) && getenv('ANTHROPIC_API_KEY') !== '',
             'workerToken' => Settings::workerToken(),
+            'digModel' => Enrich::model(),
             'workerLastSeen' => Settings::get('worker_last_seen'),
             'workerStale' => self::workerIsStale(),
             'scheduleText' => Mailer::scheduleDescription(),
@@ -835,6 +881,9 @@ final class Controller
             'engine' => in_array(Request::input('engine'), ['api', 'worker', 'manual'], true)
                 ? Request::input('engine')
                 : 'api',
+            'dig_model' => in_array(Request::input('dig_model'), Enrich::MODELS, true)
+                ? Request::input('dig_model')
+                : 'claude-sonnet-5',
         ];
 
         // Secrets are only written when a new value is typed, so an empty field

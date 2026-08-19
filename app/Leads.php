@@ -454,6 +454,85 @@ final class Leads
         Database::update('leads', $update, ['id' => $leadId]);
     }
 
+    /**
+     * A dig runs after the response has been sent, so its state lives on the
+     * lead rather than in the request.
+     *
+     * running → the browser polls
+     * done    → findings are waiting to be accepted
+     * failed  → dig_message says why
+     * null    → nothing in flight, show the button
+     */
+    public static function startDig(int $leadId): void
+    {
+        Database::update('leads', [
+            'dig_status' => 'running',
+            'dig_result' => null,
+            'dig_message' => null,
+            'dig_at' => Clock::now(),
+        ], ['id' => $leadId]);
+    }
+
+    /** @param array<string, mixed> $findings */
+    public static function finishDig(int $leadId, bool $ok, array $findings, string $message): void
+    {
+        Database::update('leads', [
+            'dig_status' => $ok ? 'done' : 'failed',
+            'dig_result' => $ok ? json_encode($findings, JSON_UNESCAPED_SLASHES) : null,
+            'dig_message' => mb_substr($message, 0, 2000),
+            'dig_at' => Clock::now(),
+        ], ['id' => $leadId]);
+    }
+
+    public static function clearDig(int $leadId): void
+    {
+        Database::update('leads', [
+            'dig_status' => null,
+            'dig_result' => null,
+            'dig_message' => null,
+            'dig_at' => null,
+        ], ['id' => $leadId]);
+    }
+
+    /**
+     * Read the dig state, decoding the stored findings.
+     *
+     * A run that started more than ten minutes ago is reported as failed: the
+     * worker process died without getting to write its result, and leaving the
+     * page polling forever is worse than saying so.
+     *
+     * @param array<string, mixed> $lead
+     * @return array{status: string|null, findings: array<string, mixed>|null, message: string|null}
+     */
+    public static function digState(array $lead): array
+    {
+        $status = $lead['dig_status'] ?? null;
+        $status = is_string($status) && $status !== '' ? $status : null;
+
+        if ($status === 'running') {
+            $started = strtotime((string) ($lead['dig_at'] ?? ''));
+            if ($started !== false && (time() - $started) > 600) {
+                return [
+                    'status' => 'failed',
+                    'findings' => null,
+                    'message' => 'The dig stopped without finishing. Try it again.',
+                ];
+            }
+        }
+
+        $findings = null;
+        if ($status === 'done' && is_string($lead['dig_result'] ?? null)) {
+            $decoded = json_decode((string) $lead['dig_result'], true);
+            $findings = is_array($decoded) ? $decoded : null;
+        }
+
+        return [
+            'status' => $status,
+            'findings' => $findings,
+            'message' => is_string($lead['dig_message'] ?? null) ? (string) $lead['dig_message'] : null,
+        ];
+    }
+
     public static function markSyncedToGhl(int $leadId, string $contactId): void
     {
         Database::update(

@@ -137,6 +137,12 @@ final class Schema
         // catches up on the next request.
         self::addColumns([
             ['users', 'ghl_pipeline_id', 'VARCHAR(120) NULL'],
+            // A dig runs in the background, so its state has to outlive the
+            // request that started it.
+            ['leads', 'dig_status', 'VARCHAR(20) NULL'],
+            ['leads', 'dig_result', 'TEXT NULL'],
+            ['leads', 'dig_message', 'TEXT NULL'],
+            ['leads', 'dig_at', 'VARCHAR(25) NULL'],
         ]);
     }
 
