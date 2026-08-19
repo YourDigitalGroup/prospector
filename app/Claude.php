@@ -46,27 +46,98 @@ final class Claude
     }
 
     /**
-     * Run a web-research turn. Handles `pause_turn`, which the API returns when
-     * a server-tool turn hits its iteration limit — the conversation is
-     * re-sent so the model picks up where it left off.
+     * Cost per million tokens, and per search. Used to report what a run
+     * actually cost rather than leaving it to turn up on a bill.
+     */
+    private const PRICING = [
+        'claude-opus-5' => ['in' => 5.00, 'out' => 25.00],
+        'claude-opus-4-8' => ['in' => 5.00, 'out' => 25.00],
+        'claude-sonnet-5' => ['in' => 3.00, 'out' => 15.00],
+        'claude-sonnet-4-6' => ['in' => 3.00, 'out' => 15.00],
+        'claude-haiku-4-5' => ['in' => 1.00, 'out' => 5.00],
+    ];
+
+    private const SEARCH_COST = 0.01; // $10 per 1,000 searches
+
+    /** Estimated US dollars for a run. Unknown models fall back to Opus rates. */
+    public static function estimateCost(string $model, int $inputTokens, int $outputTokens, int $searches = 0): float
+    {
+        $rate = self::PRICING[$model] ?? self::PRICING['claude-opus-5'];
+
+        return ($inputTokens / 1_000_000) * $rate['in']
+            + ($outputTokens / 1_000_000) * $rate['out']
+            + $searches * self::SEARCH_COST;
+    }
+
+    /**
+     * Dynamic filtering (the _20260209 tools) needs a 4.6-or-later model. On
+     * anything older the basic variants are the only ones that work, and asking
+     * for the newer type is a 400.
      *
+     * @return array{0: string, 1: string} search tool type, fetch tool type
+     */
+    private static function toolTypesFor(string $model): array
+    {
+        $modern = str_contains($model, 'opus-5') || str_contains($model, 'opus-4-8')
+            || str_contains($model, 'opus-4-7') || str_contains($model, 'opus-4-6')
+            || str_contains($model, 'sonnet-5') || str_contains($model, 'sonnet-4-6')
+            || str_contains($model, 'fable-5');
+
+        return $modern
+            ? ['web_search_20260209', 'web_fetch_20260209']
+            : ['web_search_20250305', 'web_fetch_20250910'];
+    }
+
+    /**
+     * Research with web search and fetch.
+     *
+     * The budget matters more than it looks. Every pause_turn resumes by
+     * re-sending the whole conversation, and fetched pages live in that
+     * conversation — so page content is re-billed on each continuation. Fetching
+     * 40 pages across a dozen turns is how a lookup ends up costing more than a
+     * full batch. Callers doing something narrow should say so.
+     *
+     * Handles `pause_turn`, which the API returns when a server-tool turn hits
+     * its iteration limit — the conversation is re-sent so the model picks up
+     * where it left off.
+     *
+     * @param array{
+     *     blocked_domains?: list<string>,
+     *     max_searches?: int,
+     *     max_fetches?: int,
+     *     max_content_tokens?: int,
+     *     max_continuations?: int,
+     *     max_tokens?: int
+     * } $options
      * @return array{text: string, input_tokens: int, output_tokens: int, searches: int}
      */
-    /**
-     * @param list<string> $blockedDomains Domains the model must not search or
-     *                                     fetch. Enforced by the API rather than
-     *                                     by instruction, so it holds even if the
-     *                                     model is inclined to try.
-     */
-    public function research(string $system, string $prompt, array $blockedDomains = []): array
+    public function research(string $system, string $prompt, array $options = []): array
     {
-        $search = ['type' => 'web_search_20260209', 'name' => 'web_search'];
-        $fetch = ['type' => 'web_fetch_20260209', 'name' => 'web_fetch', 'max_uses' => 40];
+        [$searchType, $fetchType] = self::toolTypesFor($this->model);
 
+        $search = ['type' => $searchType, 'name' => 'web_search'];
+        $fetch = ['type' => $fetchType, 'name' => 'web_fetch'];
+
+        $fetch['max_uses'] = (int) ($options['max_fetches'] ?? 40);
+
+        if (isset($options['max_searches'])) {
+            $search['max_uses'] = (int) $options['max_searches'];
+        }
+
+        // Caps how much of each page enters the conversation, which is the
+        // single biggest lever on what a multi-turn research run costs.
+        if (isset($options['max_content_tokens'])) {
+            $fetch['max_content_tokens'] = (int) $options['max_content_tokens'];
+        }
+
+        $blockedDomains = $options['blocked_domains'] ?? [];
         if ($blockedDomains !== []) {
             $search['blocked_domains'] = $blockedDomains;
             $fetch['blocked_domains'] = $blockedDomains;
         }
+
+        $maxContinuations = (int) ($options['max_continuations'] ?? self::MAX_CONTINUATIONS);
+        $maxTokens = (int) ($options['max_tokens'] ?? self::RESEARCH_MAX_TOKENS);
 
         $tools = [$search, $fetch];
 
@@ -78,9 +149,9 @@ final class Claude
         $searches = 0;
         $text = '';
 
-        for ($i = 0; $i <= self::MAX_CONTINUATIONS; $i++) {
+        for ($i = 0; $i <= $maxContinuations; $i++) {
             $response = $this->send([
-                'maxTokens' => self::RESEARCH_MAX_TOKENS,
+                'maxTokens' => $maxTokens,
                 'messages' => $messages,
                 'model' => $this->model,
                 'system' => $system,

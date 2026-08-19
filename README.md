@@ -188,8 +188,16 @@ page polls until the result lands. Leaving the page is fine; the result is store
 will be waiting. A run that dies without finishing is reported as failed after ten minutes rather
 than polling forever.
 
-It needs an Anthropic API key (Settings → Anthropic API) and costs roughly a few cents to a couple
-of dimes per dig. Without a key the button explains that rather than failing.
+It needs an Anthropic API key (Settings → Anthropic API). **Every dig reports what it cost**, under
+the findings, so the bill is never a surprise.
+
+Digs run on their own model — **Settings → Model for "Dig for contact details"**, Sonnet by default
+— because a dig is a lookup, not the open-ended research a batch does, and it is paid for per click.
+The tool budget is deliberately tight: 3 searches, 5 page fetches, 3,000 tokens of content per page,
+3 continuations. That matters more than it looks. Every `pause_turn` re-sends the whole
+conversation, and fetched pages live in that conversation, so page content is billed again on each
+continuation — an unbounded lookup can cost more than a full batch. On the current budget a dig is
+roughly $0.09 on Haiku, $0.21 on Sonnet, $0.33 on Opus.
 
 **It looks for business contact details only**, from the company's own site, regulatory filings,
 press releases, trade rosters and public professional profiles. People-search and data-broker sites

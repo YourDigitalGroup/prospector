@@ -200,8 +200,18 @@ if (!empty($lead['evidence'])) {
                             </div>
                         </form>
 
-                        <?php if ($dig['notes'] !== ''): ?>
+                        <?php if (($dig['notes'] ?? '') !== ''): ?>
                             <p class="hint mt"><?= View::e($dig['notes']) ?></p>
+                        <?php endif; ?>
+
+                        <?php if (isset($dig['cost']['dollars'])): ?>
+                            <p class="hint mt">
+                                Cost about <strong>$<?= number_format((float) $dig['cost']['dollars'], 2) ?></strong>
+                                — <?= number_format((int) $dig['cost']['input']) ?> in,
+                                <?= number_format((int) $dig['cost']['output']) ?> out,
+                                <?= (int) $dig['cost']['searches'] ?> search<?= (int) $dig['cost']['searches'] === 1 ? '' : 'es' ?>,
+                                on <?= View::e($dig['cost']['model']) ?>.
+                            </p>
                         <?php endif; ?>
 
                         <?php if ($dig['pages'] !== []): ?>

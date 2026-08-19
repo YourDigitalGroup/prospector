@@ -848,6 +848,7 @@ final class Controller
             'canDetach' => Background::canDetach(),
             'envKey' => is_string(getenv('ANTHROPIC_API_KEY')) && getenv('ANTHROPIC_API_KEY') !== '',
             'workerToken' => Settings::workerToken(),
+            'digModel' => Enrich::model(),
             'workerLastSeen' => Settings::get('worker_last_seen'),
             'workerStale' => self::workerIsStale(),
             'scheduleText' => Mailer::scheduleDescription(),
@@ -880,6 +881,9 @@ final class Controller
             'engine' => in_array(Request::input('engine'), ['api', 'worker', 'manual'], true)
                 ? Request::input('engine')
                 : 'api',
+            'dig_model' => in_array(Request::input('dig_model'), Enrich::MODELS, true)
+                ? Request::input('dig_model')
+                : 'claude-sonnet-5',
         ];
 
         // Secrets are only written when a new value is typed, so an empty field

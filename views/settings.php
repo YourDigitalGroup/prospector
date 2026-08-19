@@ -122,6 +122,22 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
                     <?php endif; ?>
 
                     <div class="field">
+                        <label for="dig_model">Model for "Dig for contact details"</label>
+                        <select id="dig_model" name="dig_model">
+                            <?php foreach (\Prospector\Enrich::MODELS as $option): ?>
+                                <option value="<?= View::e($option) ?>" <?= $digModel === $option ? 'selected' : '' ?>>
+                                    <?= View::e($option) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="hint">
+                            A dig is a lookup, not open-ended research, and it is paid for per click.
+                            Sonnet is the default and is well clear of what the task needs; Haiku is
+                            cheaper again if the results hold up. Each dig reports what it cost.
+                        </div>
+                    </div>
+
+                    <div class="field">
                         <label for="anthropic_api_key">API key</label>
                         <input type="password" id="anthropic_api_key" name="anthropic_api_key"
                                autocomplete="new-password"

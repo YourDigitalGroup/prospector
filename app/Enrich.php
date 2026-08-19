@@ -134,9 +134,25 @@ final class Enrich
         }
 
         try {
-            $claude = new Claude(Settings::get('model', 'claude-opus-5'), 'medium');
+            // Deliberately not the batch model. A dig is a lookup — open a team
+            // page, read an address — not the open-ended research a batch does,
+            // and it is paid for per click.
+            $model = self::model();
+            $claude = new Claude($model, 'low');
 
-            $research = $claude->research(self::SYSTEM, self::researchPrompt($lead), self::BLOCKED_DOMAINS);
+            $research = $claude->research(self::SYSTEM, self::researchPrompt($lead), [
+                'blocked_domains' => self::BLOCKED_DOMAINS,
+                // These four are the cost. Every pause_turn re-sends the whole
+                // conversation, and fetched pages sit in that conversation, so
+                // page content is billed again on each continuation. Keeping the
+                // fetch count and the per-page size down is what stops a lookup
+                // costing more than a whole batch.
+                'max_searches' => 3,
+                'max_fetches' => 5,
+                'max_content_tokens' => 3000,
+                'max_continuations' => 3,
+                'max_tokens' => 3000,
+            ]);
 
             $extract = $claude->extract(
                 self::SYSTEM,
@@ -148,16 +164,25 @@ final class Enrich
 
             $findings = self::normalise(is_array($extract['data']) ? $extract['data'] : [], $lead);
 
+            $inputTokens = (int) $research['input_tokens'] + (int) $extract['input_tokens'];
+            $outputTokens = (int) $research['output_tokens'] + (int) $extract['output_tokens'];
+            $searches = (int) ($research['searches'] ?? 0);
+
+            $findings['cost'] = [
+                'model' => $model,
+                'input' => $inputTokens,
+                'output' => $outputTokens,
+                'searches' => $searches,
+                'dollars' => round(Claude::estimateCost($model, $inputTokens, $outputTokens, $searches), 4),
+            ];
+
             return [
                 'ok' => true,
                 'findings' => $findings,
                 'message' => $findings['found'] === []
                     ? 'Nothing new found. That usually means the details are not published anywhere public.'
                     : 'Found ' . implode(', ', array_keys($findings['found'])) . '.',
-                'cost' => [
-                    'input' => (int) $research['input_tokens'] + (int) $extract['input_tokens'],
-                    'output' => (int) $research['output_tokens'] + (int) $extract['output_tokens'],
-                ],
+                'cost' => ['input' => $inputTokens, 'output' => $outputTokens],
             ];
         } catch (Throwable $e) {
             return [
@@ -390,4 +415,21 @@ final class Enrich
     {
         return self::BLOCKED_DOMAINS;
     }
+
+    /**
+     * Which model digs run on. Sonnet by default: it supports the newer search
+     * tools, whose dynamic filtering keeps page content out of the context in
+     * the first place, and it is well clear of what this task needs. Haiku is
+     * cheaper again if the results hold up; Opus is available but a dig does not
+     * need it and the difference shows up per click.
+     */
+    public static function model(): string
+    {
+        $model = Settings::get('dig_model', 'claude-sonnet-5');
+
+        return in_array($model, self::MODELS, true) ? $model : 'claude-sonnet-5';
+    }
+
+    /** @var list<string> */
+    public const MODELS = ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5'];
 }
