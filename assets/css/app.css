@@ -878,3 +878,37 @@ input[type="file"] {
 }
 
 .card-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* ------------------------------------------- dig for contact details */
+
+.finding {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.finding:last-of-type { border-bottom: 0; }
+.finding .check { margin-bottom: 3px; }
+.finding label { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.finding-label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); min-width: 96px; }
+.finding-value { font-size: 13.5px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.finding-source { font-size: 11.5px; color: var(--muted); padding-left: 23px; overflow-wrap: anywhere; }
+.warn-text { color: var(--warning); }
+
+/* A dig takes 20-40 seconds, so the button has to say something is happening. */
+.btn.is-digging { opacity: .65; pointer-events: none; }
+
+.linkish {
+    background: none;
+    border: 0;
+    padding: 0;
+    margin-top: 3px;
+    font: inherit;
+    font-size: 11.5px;
+    color: var(--link);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.linkish:hover { text-decoration: underline; }

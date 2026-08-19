@@ -425,6 +425,35 @@ final class Leads
         );
     }
 
+    /**
+     * Write contact fields on an existing lead. Whitelisted rather than
+     * accepting whatever is handed in — this is fed from a form, and company,
+     * company_key, user_id and fit_score must never be editable this way.
+     *
+     * @param array<string, string> $fields
+     */
+    public static function updateFields(int $leadId, array $fields): void
+    {
+        $allowed = [
+            'website', 'decision_maker', 'title', 'email', 'email_confidence',
+            'phone', 'direct_phone', 'linkedin',
+        ];
+
+        $update = [];
+        foreach ($allowed as $column) {
+            if (array_key_exists($column, $fields)) {
+                $update[$column] = mb_substr(trim((string) $fields[$column]), 0, 190);
+            }
+        }
+
+        if ($update === []) {
+            return;
+        }
+
+        $update['updated_at'] = Clock::now();
+        Database::update('leads', $update, ['id' => $leadId]);
+    }
+
     public static function markSyncedToGhl(int $leadId, string $contactId): void
     {
         Database::update(

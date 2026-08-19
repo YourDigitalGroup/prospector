@@ -6,6 +6,7 @@ namespace Prospector\Http;
 
 use Prospector\Auth;
 use Prospector\Claude;
+use Prospector\Enrich;
 use Prospector\GoHighLevel;
 use Prospector\LeadImport;
 use Prospector\Leads;
@@ -146,14 +147,31 @@ final class Controller
             self::forbidden();
         }
 
-        View::page('lead', [
+        self::renderLead($lead);
+    }
+
+    /**
+     * Render the lead screen. Shared by the normal view and by a dig, which
+     * needs to show its findings on the same page rather than redirecting.
+     *
+     * @param array<string, mixed> $lead
+     * @param array<string, mixed> $extra
+     */
+    private static function renderLead(array $lead, array $extra = []): void
+    {
+        $id = (int) $lead['id'];
+
+        View::page('lead', array_merge([
             'title' => (string) $lead['company'],
             'lead' => $lead,
             'activities' => Leads::activities($id),
             'owners' => Auth::isAdmin() ? Users::all() : [],
             'ghlReady' => GoHighLevel::forUser(Users::find((int) $lead['user_id'])) !== null,
             'run' => $lead['run_id'] !== null ? Runs::find((int) $lead['run_id']) : null,
-        ]);
+            'dig' => null,
+            'digMessage' => null,
+            'digOk' => true,
+        ], $extra));
     }
 
     public static function leadAction(int $id, string $action): void
@@ -216,11 +234,90 @@ final class Controller
                 self::flash($result['ok'] ? 'success' : 'error', $result['message']);
                 break;
 
+            case 'dig':
+                // Renders rather than redirects — the findings have to be shown
+                // and accepted before anything is written to the lead.
+                Background::extendLimits(300);
+                $dug = Enrich::dig($lead);
+
+                self::renderLead($lead, [
+                    'dig' => $dug['ok'] ? $dug['findings'] : null,
+                    'digMessage' => $dug['message'],
+                    'digOk' => $dug['ok'],
+                ]);
+
+                return;
+
+            case 'dig-apply':
+                self::applyDig($id, $lead);
+                break;
+
             default:
                 self::flash('error', 'Unknown action.');
         }
 
         self::redirect($back);
+    }
+
+    /**
+     * Write the fields the rep ticked. Values travel in hidden inputs from the
+     * findings panel, so only what was shown can be applied — and each one is
+     * recorded on the timeline with the URL it came from, because in six weeks
+     * "where did this address come from" is the question that matters.
+     *
+     * @param array<string, mixed> $lead
+     */
+    private static function applyDig(int $id, array $lead): void
+    {
+        $map = Enrich::fieldMap();
+        $chosen = [];
+        $noteLines = [];
+
+        foreach ($map as $label => $column) {
+            $key = str_replace(' ', '_', $label);
+
+            if (!Request::bool('apply_' . $key)) {
+                continue;
+            }
+
+            $value = trim(Request::raw('value_' . $key));
+            if ($value === '') {
+                continue;
+            }
+
+            $chosen[$column] = $value;
+
+            $source = trim(Request::raw('source_' . $key));
+            $noteLines[] = ucfirst($label) . ': ' . $value
+                . ($source !== '' ? ' — found at ' . $source : ' — no source recorded');
+        }
+
+        if ($chosen === []) {
+            self::flash('error', 'Nothing was ticked, so nothing changed.');
+
+            return;
+        }
+
+        // An email arriving from a dig carries its confidence with it. Without
+        // one it is treated as unverified, which keeps it out of the
+        // GoHighLevel email field until someone confirms it.
+        if (isset($chosen['email'])) {
+            $confidence = Request::input('confidence_email');
+            $chosen['email_confidence'] = in_array($confidence, ['verified', 'high', 'pattern'], true)
+                ? $confidence
+                : 'pattern';
+            $noteLines[] = 'Email confidence: ' . $chosen['email_confidence'];
+        }
+
+        Leads::updateFields($id, $chosen);
+        Leads::addActivity(
+            $id,
+            Auth::id(),
+            'note',
+            "Contact details added by a dig:\n" . implode("\n", $noteLines)
+        );
+
+        self::flash('success', 'Saved ' . implode(', ', array_keys($chosen)) . '.');
     }
 
     public static function leadsBulk(): void

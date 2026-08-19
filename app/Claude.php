@@ -52,12 +52,23 @@ final class Claude
      *
      * @return array{text: string, input_tokens: int, output_tokens: int, searches: int}
      */
-    public function research(string $system, string $prompt): array
+    /**
+     * @param list<string> $blockedDomains Domains the model must not search or
+     *                                     fetch. Enforced by the API rather than
+     *                                     by instruction, so it holds even if the
+     *                                     model is inclined to try.
+     */
+    public function research(string $system, string $prompt, array $blockedDomains = []): array
     {
-        $tools = [
-            ['type' => 'web_search_20260209', 'name' => 'web_search'],
-            ['type' => 'web_fetch_20260209', 'name' => 'web_fetch', 'max_uses' => 40],
-        ];
+        $search = ['type' => 'web_search_20260209', 'name' => 'web_search'];
+        $fetch = ['type' => 'web_fetch_20260209', 'name' => 'web_fetch', 'max_uses' => 40];
+
+        if ($blockedDomains !== []) {
+            $search['blocked_domains'] = $blockedDomains;
+            $fetch['blocked_domains'] = $blockedDomains;
+        }
+
+        $tools = [$search, $fetch];
 
         /** @var list<array<string, mixed>> $messages */
         $messages = [['role' => 'user', 'content' => $prompt]];

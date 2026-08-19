@@ -104,7 +104,106 @@ if (!empty($lead['evidence'])) {
         </div>
 
         <div class="card">
-            <div class="card-head"><h2>Contact</h2></div>
+            <div class="card-head">
+                <h2>Contact</h2>
+                <?php if (\Prospector\Enrich::isThin($lead)): ?>
+                    <form method="post" action="<?= View::e(View::url('leads/' . (int) $lead['id'] . '/dig')) ?>"
+                          class="inline-form" data-dig-form>
+                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                        <button class="btn btn-sm" type="submit" data-dig-button>
+                            <?php $name = 'search'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                            Dig for contact details
+                        </button>
+                    </form>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($digMessage !== null): ?>
+                <div class="card-body">
+                    <div class="alert <?= $digOk && $dig !== null && $dig['found'] !== [] ? 'alert-success' : ($digOk ? 'alert-info' : 'alert-error') ?>">
+                        <?php $name = $digOk ? 'check' : 'alert'; $size = 17; require __DIR__ . '/partials/icon.php'; ?>
+                        <div><?= View::e($digMessage) ?></div>
+                    </div>
+
+                    <?php if ($dig !== null && $dig['found'] !== []): ?>
+                        <form method="post" action="<?= View::e(View::url('leads/' . (int) $lead['id'] . '/dig-apply')) ?>">
+                            <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+
+                            <p class="hint mb">Tick what you want saved. Nothing is written until you do.</p>
+
+                            <?php foreach ($dig['found'] as $label => $finding): ?>
+                                <?php $key = str_replace(' ', '_', $label); ?>
+                                <div class="finding">
+                                    <div class="check">
+                                        <input type="checkbox" id="apply_<?= View::e($key) ?>"
+                                               name="apply_<?= View::e($key) ?>" value="1" checked>
+                                        <label for="apply_<?= View::e($key) ?>">
+                                            <span class="finding-label"><?= View::e($label) ?></span>
+                                            <span class="finding-value"><?= View::e($finding['value']) ?></span>
+                                            <?php if (isset($finding['confidence'])): ?>
+                                                <span class="badge badge-<?= View::e($finding['confidence']) ?>">
+                                                    <?= View::e($finding['confidence']) ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </label>
+                                    </div>
+
+                                    <div class="finding-source">
+                                        <?php if ($finding['source'] !== ''): ?>
+                                            Found at
+                                            <a href="<?= View::e($finding['source']) ?>" target="_blank" rel="noopener noreferrer">
+                                                <?= View::e($finding['source']) ?>
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="warn-text">No source URL — treat as unconfirmed.</span>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <input type="hidden" name="value_<?= View::e($key) ?>" value="<?= View::e($finding['value']) ?>">
+                                    <input type="hidden" name="source_<?= View::e($key) ?>" value="<?= View::e($finding['source']) ?>">
+                                    <?php if (isset($finding['confidence'])): ?>
+                                        <input type="hidden" name="confidence_<?= View::e($key) ?>" value="<?= View::e($finding['confidence']) ?>">
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+
+                            <?php if (isset($dig['found']['email']) && ($dig['found']['email']['confidence'] ?? '') === 'pattern'): ?>
+                                <div class="alert alert-warning">
+                                    <?php $name = 'alert'; $size = 17; require __DIR__ . '/partials/icon.php'; ?>
+                                    <div>
+                                        That address was <strong>inferred from the company's format, not found</strong>.
+                                        It will be saved as <code>pattern</code>, which keeps it out of the GoHighLevel
+                                        email field. Confirm it before any bulk send.
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <div class="btn-row">
+                                <button class="btn btn-primary" type="submit">Save the ticked details</button>
+                                <a class="btn btn-ghost" href="<?= View::e(View::url('leads/' . (int) $lead['id'])) ?>">Discard</a>
+                            </div>
+                        </form>
+
+                        <?php if ($dig['notes'] !== ''): ?>
+                            <p class="hint mt"><?= View::e($dig['notes']) ?></p>
+                        <?php endif; ?>
+
+                        <?php if ($dig['pages'] !== []): ?>
+                            <details class="mt">
+                                <summary class="hint">Pages opened (<?= count($dig['pages']) ?>)</summary>
+                                <ul class="notes mt-sm">
+                                    <?php foreach ($dig['pages'] as $page): ?>
+                                        <li><a href="<?= View::e($page) ?>" target="_blank" rel="noopener noreferrer"><?= View::e($page) ?></a></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </details>
+                        <?php endif; ?>
+                    <?php elseif ($dig !== null && $dig['notes'] !== ''): ?>
+                        <p class="hint"><?= View::e($dig['notes']) ?></p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
             <div class="card-body">
                 <dl class="kv">
                     <dt>Decision-maker</dt>

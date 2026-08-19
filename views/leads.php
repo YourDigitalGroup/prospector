@@ -275,6 +275,18 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
+
+                                <?php if (\Prospector\Enrich::isThin($lead)): ?>
+                                    <form method="post" class="inline-form"
+                                          action="<?= View::e(View::url('leads/' . $lead['id'] . '/dig')) ?>">
+                                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                                        <button class="linkish" type="submit"
+                                                title="Search business sources for a work email or phone">
+                                            <?php $name = 'search'; $size = 12; require __DIR__ . '/partials/icon.php'; ?>
+                                            Dig for details
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
                             </td>
                             <td class="nowrap"><?= View::e($lead['market'] ?? '—') ?></td>
                             <td class="cell-clip small dim"><?= View::e(mb_strimwidth((string) ($lead['why'] ?? ''), 0, 150, '…')) ?></td>
