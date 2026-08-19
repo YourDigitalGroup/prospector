@@ -65,6 +65,7 @@ try {
 
         $path === '/leads' => Controller::leads(),
         $path === '/leads/export' => Controller::leadsExport(),
+        $path === '/leads/import' => Controller::leadsImport(),
         $path === '/leads/bulk' && $method === 'POST' => Controller::leadsBulk(),
 
         $path === '/runs' => Controller::runs(),

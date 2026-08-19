@@ -53,6 +53,10 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
         </div>
     </div>
     <div class="page-head-actions">
+        <a class="btn" href="<?= View::e(View::url('leads/import')) ?>">
+            <?php $name = 'plus'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+            Upload leads
+        </a>
         <a class="btn" href="<?= View::e(View::url('leads/export', $query)) ?>">
             <?php $name = 'download'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
             Export CSV

@@ -7,6 +7,7 @@ namespace Prospector\Http;
 use Prospector\Auth;
 use Prospector\Claude;
 use Prospector\GoHighLevel;
+use Prospector\LeadImport;
 use Prospector\Leads;
 use Prospector\Mailer;
 use Prospector\Prospector;
@@ -276,6 +277,209 @@ final class Controller
 
         self::flash($done > 0 ? 'success' : 'error', $summary . '.');
         self::redirect($back);
+    }
+
+    /**
+     * Upload a lead list: CSV or JSON, parsed and shown back before anything is
+     * stored. Three states on one route — empty form, preview, commit.
+     *
+     * Uploads deliberately do NOT apply the fit-score floor. That floor exists
+     * to stop a research engine padding a batch to hit a number; a person
+     * uploading a file has already made that judgement.
+     */
+    public static function leadsImport(): void
+    {
+        self::requireLogin();
+
+        $owners = Auth::isAdmin() ? Users::all() : [];
+
+        $render = static function (array $extra) use ($owners): void {
+            View::page('leads_import', array_merge([
+                'title' => 'Upload leads',
+                'owners' => $owners,
+                'rows' => [],
+                'problems' => [],
+                'columns' => [],
+                'ignored' => [],
+                'raw' => '',
+                'targetUserId' => Auth::id(),
+                'sendEmail' => false,
+                'fields' => LeadImport::fields(),
+            ], $extra));
+        };
+
+        if (!Request::isPost()) {
+            $render([]);
+
+            return;
+        }
+
+        self::requireCsrf();
+
+        $target = self::importTarget();
+        $sendEmail = Request::bool('send_email');
+
+        // Second pass: the rows have already been parsed and shown, and the
+        // hidden field carries exactly what the preview displayed.
+        if (Request::raw('confirm') === '1') {
+            /** @var mixed $decoded */
+            $decoded = json_decode(Request::raw('parsed'), true);
+            $rows = is_array($decoded) ? $decoded : [];
+
+            if ($rows === []) {
+                self::flash('error', 'Nothing was imported — the confirmed list was empty.');
+                self::redirect('/leads/import');
+            }
+
+            $result = self::storeImported($target, $rows, $sendEmail);
+
+            self::flash(
+                $result['stored'] > 0 ? 'success' : 'error',
+                $result['message']
+            );
+            self::redirect($result['stored'] > 0 ? '/leads' : '/leads/import');
+        }
+
+        // First pass: read the file if one came, otherwise the pasted box.
+        $raw = '';
+        $fromFile = false;
+        $upload = $_FILES['file'] ?? null;
+
+        if (is_array($upload) && (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $size = (int) ($upload['size'] ?? 0);
+            if ($size > 2 * 1024 * 1024) {
+                self::flash('error', 'That file is larger than 2MB. Split it, or paste the rows instead.');
+                self::redirect('/leads/import');
+            }
+            $contents = @file_get_contents((string) $upload['tmp_name']);
+            $raw = $contents === false ? '' : $contents;
+            $fromFile = trim($raw) !== '';
+        }
+
+        if (trim($raw) === '') {
+            $raw = Request::raw('raw');
+        }
+
+        $parsed = LeadImport::parse($raw);
+
+        $render([
+            'rows' => $parsed['rows'],
+            'problems' => $parsed['problems'],
+            'columns' => $parsed['columns'],
+            'ignored' => $parsed['ignored'],
+            // Only echo back what was typed. Replaying an uploaded file into the
+            // textarea would be unreadable for anything but a tiny list.
+            'raw' => $fromFile ? '' : $raw,
+            'targetUserId' => (int) $target['id'],
+            'sendEmail' => $sendEmail,
+        ]);
+    }
+
+    /**
+     * Whose leads these become. An admin may import for anyone; everyone else
+     * imports for themselves whatever they post.
+     *
+     * @return array<string, mixed>
+     */
+    private static function importTarget(): array
+    {
+        $self = Auth::user();
+
+        if ($self === null) {
+            self::redirect('/login');
+        }
+
+        if (!Auth::isAdmin()) {
+            return $self;
+        }
+
+        $requested = Request::int('user_id', 0);
+        if ($requested <= 0) {
+            return $self;
+        }
+
+        return Users::find($requested) ?? $self;
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param list<mixed>          $rows
+     * @return array{stored: int, skipped: int, message: string}
+     */
+    private static function storeImported(array $user, array $rows, bool $sendEmail): array
+    {
+        $loop = (string) $user['loop'];
+        if (!in_array($loop, ['partner', 'client'], true)) {
+            $loop = 'partner';
+        }
+
+        $runId = Runs::start(
+            (int) $user['id'],
+            $loop,
+            Clock::today(),
+            'upload',
+            'Uploaded list',
+            '',
+            'upload'
+        );
+
+        $stored = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            if (!is_array($row) || trim((string) ($row['company'] ?? '')) === '') {
+                $skipped++;
+                continue;
+            }
+
+            $id = Leads::create((int) $user['id'], $runId, $row);
+
+            if ($id > 0) {
+                $stored++;
+                Leads::addActivity($id, Auth::id(), 'created', 'Added from an uploaded list');
+            } else {
+                // Already on file for this owner — de-duplication is the point.
+                $skipped++;
+            }
+        }
+
+        $brief = "## Uploaded list\n\n"
+            . '- Imported by: ' . (string) (Auth::user()['name'] ?? 'unknown') . "\n"
+            . '- Stored: ' . $stored . "\n"
+            . '- Skipped as already on file: ' . $skipped . "\n";
+
+        Runs::finish($runId, [
+            'status' => $stored > 0 ? 'success' : 'partial',
+            'lead_count' => $stored,
+            'brief_md' => $brief,
+        ]);
+
+        $emailNote = '';
+        if ($sendEmail && $stored > 0) {
+            $run = Runs::find($runId);
+            if ($run !== null) {
+                $mail = Mailer::sendDailyBrief($user, $run, Leads::forRun($runId));
+                if ($mail['ok']) {
+                    Runs::markEmailed($runId);
+                    $emailNote = ' Emailed to ' . (string) $user['email'] . '.';
+                } else {
+                    $emailNote = ' The email failed: ' . $mail['message'];
+                }
+            }
+        }
+
+        $message = $stored === 0
+            ? 'Nothing new was imported — all ' . $skipped . ' were already on file for ' . (string) $user['name'] . '.'
+            : sprintf(
+                'Imported %d lead%s for %s.%s%s',
+                $stored,
+                $stored === 1 ? '' : 's',
+                (string) $user['name'],
+                $skipped > 0 ? ' ' . $skipped . ' skipped as already on file.' : '',
+                $emailNote
+            );
+
+        return ['stored' => $stored, 'skipped' => $skipped, 'message' => $message];
     }
 
     public static function leadsExport(): void
