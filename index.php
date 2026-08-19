@@ -36,7 +36,8 @@ View::share([
 
 try {
     // /leads/{id} and /leads/{id}/{action}
-    if (preg_match('#^/leads/(\d+)(?:/([a-z]+))?$#', $path, $m) === 1) {
+    // Hyphens allowed so multi-word actions like dig-apply route cleanly.
+    if (preg_match('#^/leads/(\d+)(?:/([a-z-]+))?$#', $path, $m) === 1) {
         $id = (int) $m[1];
         $action = $m[2] ?? '';
 

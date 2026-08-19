@@ -173,6 +173,28 @@ Nothing is stored until the preview is confirmed. Three deliberate choices there
 - **De-duplication is per owner**, so re-uploading the same list is safe, and the same company can
   legitimately sit with both Billy and Darren.
 
+### Digging for missing contact details
+
+A lead that arrives without an email or phone gets a **Dig for contact details** button, on the
+lead screen and on the list row. It runs a two-pass search — Claude with web search and web fetch,
+then a structured extraction — and shows what it found with the URL each value came from. Nothing
+is written to the lead until someone ticks it, and every accepted value lands on the timeline with
+its source, because "where did this address come from" is the question that matters six weeks later.
+
+It needs an Anthropic API key (Settings → Anthropic API) and costs roughly a few cents to a couple
+of dimes per dig. Without a key the button explains that rather than failing.
+
+**It looks for business contact details only**, from the company's own site, regulatory filings,
+press releases, trade rosters and public professional profiles. People-search and data-broker sites
+(fastpeoplesearch, truepeoplesearch, whitepages, spokeo and the rest) are **blocked at the API
+level** via `blocked_domains`, not merely discouraged in the prompt. Three reasons, in `app/Enrich.php`:
+they return home addresses and personal mobiles rather than work contacts; a personal mobile in the
+phone column is a TCPA problem once a GoHighLevel sequence can text it; and they block automated
+access anyway.
+
+The same confidence discipline applies as everywhere else — a `verified` claim that arrives without
+a source URL is downgraded to `pattern`, which keeps it out of the GoHighLevel email field.
+
 ### Running one by hand
 
 **Batches → Run now**, or from the command line:

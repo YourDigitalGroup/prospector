@@ -263,4 +263,15 @@
             if (confirmField) confirmField.value = '1';
         });
     }
+
+    // ---- digging takes 20-40s, so say so rather than looking dead --------
+    var digForm = document.querySelector('[data-dig-form]');
+    if (digForm) {
+        digForm.addEventListener('submit', function () {
+            var button = digForm.querySelector('[data-dig-button]');
+            if (!button) return;
+            button.classList.add('is-digging');
+            button.textContent = 'Digging — this takes up to a minute…';
+        });
+    }
 })();
