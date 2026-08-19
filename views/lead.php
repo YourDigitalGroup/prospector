@@ -106,7 +106,9 @@ if (!empty($lead['evidence'])) {
         <div class="card">
             <div class="card-head">
                 <h2>Contact</h2>
-                <?php if (\Prospector\Enrich::isThin($lead)): ?>
+                <?php if ($digStatus === 'running'): ?>
+                    <span class="pill"><span class="spinner"></span> Digging…</span>
+                <?php elseif (\Prospector\Enrich::isThin($lead)): ?>
                     <form method="post" action="<?= View::e(View::url('leads/' . (int) $lead['id'] . '/dig')) ?>"
                           class="inline-form" data-dig-form>
                         <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
@@ -118,10 +120,21 @@ if (!empty($lead['evidence'])) {
                 <?php endif; ?>
             </div>
 
-            <?php if ($digMessage !== null): ?>
+            <?php if ($digStatus === 'running'): ?>
+                <div class="card-body" data-poll-seconds="5">
+                    <div class="alert alert-info">
+                        <span class="spinner"></span>
+                        <div>
+                            Searching the company's own site, filings and press coverage for contact
+                            details. This usually takes under a minute — you can leave this page and
+                            come back, the result will be waiting.
+                        </div>
+                    </div>
+                </div>
+            <?php elseif ($digStatus !== null && $digMessage !== null): ?>
                 <div class="card-body">
-                    <div class="alert <?= $digOk && $dig !== null && $dig['found'] !== [] ? 'alert-success' : ($digOk ? 'alert-info' : 'alert-error') ?>">
-                        <?php $name = $digOk ? 'check' : 'alert'; $size = 17; require __DIR__ . '/partials/icon.php'; ?>
+                    <div class="alert <?= $digStatus === 'done' && $dig !== null && ($dig['found'] ?? []) !== [] ? 'alert-success' : ($digStatus === 'done' ? 'alert-info' : 'alert-error') ?>">
+                        <?php $name = $digStatus === 'done' ? 'check' : 'alert'; $size = 17; require __DIR__ . '/partials/icon.php'; ?>
                         <div><?= View::e($digMessage) ?></div>
                     </div>
 
@@ -180,7 +193,10 @@ if (!empty($lead['evidence'])) {
 
                             <div class="btn-row">
                                 <button class="btn btn-primary" type="submit">Save the ticked details</button>
-                                <a class="btn btn-ghost" href="<?= View::e(View::url('leads/' . (int) $lead['id'])) ?>">Discard</a>
+                                <button class="btn btn-ghost" type="submit"
+                                        formaction="<?= View::e(View::url('leads/' . (int) $lead['id'] . '/dig-dismiss')) ?>">
+                                    Discard
+                                </button>
                             </div>
                         </form>
 
@@ -198,8 +214,14 @@ if (!empty($lead['evidence'])) {
                                 </ul>
                             </details>
                         <?php endif; ?>
-                    <?php elseif ($dig !== null && $dig['notes'] !== ''): ?>
-                        <p class="hint"><?= View::e($dig['notes']) ?></p>
+                    <?php else: ?>
+                        <?php if ($dig !== null && ($dig['notes'] ?? '') !== ''): ?>
+                            <p class="hint"><?= View::e($dig['notes']) ?></p>
+                        <?php endif; ?>
+                        <form method="post" action="<?= View::e(View::url('leads/' . (int) $lead['id'] . '/dig-dismiss')) ?>">
+                            <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                            <button class="btn btn-sm btn-ghost" type="submit">Dismiss</button>
+                        </form>
                     <?php endif; ?>
                 </div>
             <?php endif; ?>

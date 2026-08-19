@@ -181,6 +181,13 @@ then a structured extraction — and shows what it found with the URL each value
 is written to the lead until someone ticks it, and every accepted value lands on the timeline with
 its source, because "where did this address come from" is the question that matters six weeks later.
 
+**It runs in the background.** A dig takes 30-60 seconds, which outlasts the request timeout on
+shared hosting — held open, the connection dies and the browser is left on a POST-only URL, which
+answers a GET with a 404. So the response goes out first, the work happens after it, and the lead
+page polls until the result lands. Leaving the page is fine; the result is stored on the lead and
+will be waiting. A run that dies without finishing is reported as failed after ten minutes rather
+than polling forever.
+
 It needs an Anthropic API key (Settings → Anthropic API) and costs roughly a few cents to a couple
 of dimes per dig. Without a key the button explains that rather than failing.
 
