@@ -188,8 +188,11 @@ class Config:
         if missing:
             raise SystemExit(f"config.json is missing: {', '.join(missing)}")
 
+        # Keys starting with an underscore are the documentation the example
+        # config ships with, not settings — warning about them trains people to
+        # ignore the warning that matters, which is a genuine typo in a key.
         known = {f for f in cls.__dataclass_fields__}  # type: ignore[attr-defined]
-        unknown = set(raw) - known
+        unknown = {k for k in set(raw) - known if not k.startswith("_")}
         if unknown:
             log(f"note: ignoring unrecognised config keys: {', '.join(sorted(unknown))}")
 

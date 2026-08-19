@@ -151,6 +151,28 @@ happen on your machine and the finished rows arrive over `/api/import`, where th
 the de-duplication are applied again — a buggy or over-eager worker cannot lower the bar. That
 worker never emits a `pattern` address at all, because it never infers one.
 
+### Uploading a list by hand
+
+**Leads → Upload leads** takes a CSV or a JSON array. Header names are matched loosely, so
+`Company Name`, `company_name` and `Organization` all land in the same field and a list you
+already have usually imports as-is; commas, semicolons and tabs all work. A JSON payload prepared
+for `/api/import` can be pasted straight in, envelope and all.
+
+Only `company` is required. The rest are optional: `website`, `vertical`, `door`, `market`,
+`state`, `decision_maker`, `title`, `email`, `email_confidence`, `phone`, `direct_phone`,
+`linkedin`, `fit_score`, `why`, `hook`, `evidence`.
+
+Nothing is stored until the preview is confirmed. Three deliberate choices there:
+
+- **Uploads do not apply the fit-score floor.** That floor stops a research batch padding itself
+  to hit a number; someone uploading a file has already made that judgement. Unscored rows land
+  at 0.
+- **An email with no stated confidence is treated as `pattern`**, i.e. unverified, which keeps it
+  out of the GoHighLevel email field until a human confirms it. Assuming otherwise is how an
+  unchecked address ends up in a bulk send.
+- **De-duplication is per owner**, so re-uploading the same list is safe, and the same company can
+  legitimately sit with both Billy and Darren.
+
 ### Running one by hand
 
 **Batches → Run now**, or from the command line:
