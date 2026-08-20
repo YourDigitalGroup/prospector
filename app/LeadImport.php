@@ -331,4 +331,85 @@ final class LeadImport
     {
         return array_keys(self::ALIASES);
     }
+
+    /**
+     * A worked example of an import file, offered as a download so nobody has
+     * to guess the column names from prose.
+     *
+     * It lives here rather than in the controller so it cannot drift from
+     * ALIASES: the headers are the canonical field names, and a field added
+     * above shows up in the sample the moment it is added.
+     *
+     * Every company and person is invented and every address is at
+     * example.com, so a copy of this file that gets loaded by mistake sends
+     * nothing to anyone real.
+     *
+     * Three rows on purpose: a full one, one for the other loop, and one with
+     * almost nothing in it — because "only company is required" is easier to
+     * believe when you can see it.
+     *
+     * @return list<array<string, string|int>>
+     */
+    public static function sample(): array
+    {
+        return [
+            [
+                'company' => 'Prairie Sky Radio',
+                'website' => 'https://prairieskyradio.example.com',
+                'vertical' => 'Independent radio',
+                'door' => 'Gap Filler',
+                'market' => 'Sioux City',
+                'state' => 'IA',
+                'decision_maker' => 'Dana Whitfield',
+                'title' => 'General Manager',
+                'email' => 'dwhitfield@example.com',
+                'email_confidence' => 'verified',
+                'phone' => '(712) 555-0142',
+                'direct_phone' => '(712) 555-0188',
+                'linkedin' => 'https://www.linkedin.com/in/example-profile',
+                'fit_score' => 88,
+                'why' => 'Sells social and websites but nothing programmatic; hiring a digital sales rep.',
+                'hook' => 'Saw you are hiring a digital seller — what happens when they sell OTT?',
+                'evidence' => 'prairieskyradio.example.com/advertise, careers page',
+            ],
+            [
+                'company' => 'Cedar Valley Regional Health',
+                'website' => 'https://cedarvalleyhealth.example.org',
+                'vertical' => 'Healthcare',
+                'door' => 'Growth Moment',
+                'market' => 'Brookings',
+                'state' => 'SD',
+                'decision_maker' => 'Marcus Adeyemi',
+                'title' => 'Director of Marketing & Communications',
+                'email' => 'madeyemi@example.org',
+                'email_confidence' => 'pattern',
+                'phone' => '(605) 555-0117',
+                'direct_phone' => '',
+                'linkedin' => '',
+                'fit_score' => 81,
+                'why' => 'Broke ground on a new orthopedics wing in March; no video anywhere on the site.',
+                'hook' => 'Congratulations on the orthopedics wing — is the campaign for it already placed?',
+                'evidence' => 'Press release, 12 March',
+            ],
+            [
+                'company' => 'Bluestem Outdoor Advertising',
+                'website' => '',
+                'vertical' => '',
+                'door' => '',
+                'market' => 'Fargo',
+                'state' => 'ND',
+                'decision_maker' => '',
+                'title' => '',
+                'email' => '',
+                'email_confidence' => '',
+                'phone' => '',
+                'direct_phone' => '',
+                'linkedin' => '',
+                'fit_score' => '',
+                'why' => 'Only company is required — everything else can be blank and filled in later.',
+                'hook' => '',
+                'evidence' => '',
+            ],
+        ];
+    }
 }

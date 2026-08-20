@@ -75,6 +75,21 @@
 
         boxes.forEach(function (box) { box.addEventListener('change', refresh); });
         refresh();
+
+        // Only the delete action confirms. A blanket data-confirm on this form
+        // would make marking six leads "contacted" a two-step job, which is
+        // how people learn to click through warnings without reading them.
+        bulkForm.addEventListener('submit', function (event) {
+            var action = bulkForm.querySelector('[name="bulk_action"]');
+            if (!action || action.value !== 'delete') return;
+
+            var count = boxes.filter(function (b) { return b.checked; }).length;
+            var message = 'Delete ' + count + (count === 1 ? ' lead' : ' leads')
+                + ' for good? This cannot be undone, and their notes and history go too.'
+                + ' Archive instead if you only want them out of the working list.';
+
+            if (!window.confirm(message)) event.preventDefault();
+        });
     }
 
     // ---- auto-submit filters --------------------------------------------

@@ -111,6 +111,22 @@ $show = array_values(array_filter($preferred, static function (string $field) us
                 <?php endforeach; ?>
             </div>
 
+            <div class="btn-row mt">
+                <a class="btn btn-sm" href="<?= View::e(View::url('leads/sample.csv')) ?>">
+                    <?php $name = 'download'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                    Sample CSV
+                </a>
+                <a class="btn btn-sm" href="<?= View::e(View::url('leads/sample.json')) ?>">
+                    <?php $name = 'download'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                    Sample JSON
+                </a>
+            </div>
+            <div class="hint">
+                Three made-up rows with the right headers — fill it in, or hand it to whoever
+                is building your list. Every address in it is at <code>example.com</code>, so
+                importing the sample by accident emails nobody.
+            </div>
+
             <ul class="notes mt">
                 <li><strong>No fit-score floor applies to uploads.</strong> That floor stops a research
                     batch padding itself to hit a number; you have already made that call. Rows with no

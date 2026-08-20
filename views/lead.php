@@ -376,9 +376,21 @@ if (!empty($lead['evidence'])) {
                         <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/restore')) ?>">
                             <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
                             <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
-                            <button type="submit" class="btn btn-sm">Restore</button>
+                            <button type="submit" class="btn btn-sm">
+                                <?php $name = 'unarchive'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                                Unarchive
+                            </button>
                         </form>
                     <?php endif; ?>
+
+                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/delete')) ?>"
+                          data-confirm="Delete <?= View::e($lead['company']) ?> for good? This cannot be undone, and the notes and history go with it. Archive instead if you only want it out of the working list.">
+                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                        <button type="submit" class="btn btn-sm btn-danger">
+                            <?php $name = 'trash'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                            Delete
+                        </button>
+                    </form>
 
                     <?php if (Auth::isAdmin() && $owners !== []): ?>
                         <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reassign')) ?>" class="row">

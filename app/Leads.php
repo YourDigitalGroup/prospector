@@ -190,7 +190,9 @@ final class Leads
             $params['search'] = '%' . str_replace(['%', '_'], ['\%', '\_'], (string) $filters['search']) . '%';
         }
 
-        if (empty($filters['include_archived'])) {
+        if (!empty($filters['archived_only'])) {
+            $where[] = 'l.archived_at IS NOT NULL';
+        } elseif (empty($filters['include_archived'])) {
             $where[] = 'l.archived_at IS NULL';
         }
 
@@ -363,6 +365,27 @@ final class Leads
     {
         Database::update('leads', ['archived_at' => null, 'updated_at' => Clock::now()], ['id' => $leadId]);
         self::addActivity($leadId, $actorId, 'restore', 'Lead restored');
+    }
+
+    /**
+     * Remove a lead and its activity trail for good.
+     *
+     * Archiving is the reversible option and the one the screens lead with.
+     * This is for rows that should never have existed — a bad import, the same
+     * company under a second spelling, a test row. There is no undo, so every
+     * caller confirms first.
+     *
+     * The activity rows go too. Nothing enforces the foreign key on SQLite by
+     * default, so leaving them would strand them against an id that is free to
+     * be handed to a different lead later.
+     */
+    public static function delete(int $leadId): bool
+    {
+        return (bool) Database::transaction(static function () use ($leadId): bool {
+            Database::run('DELETE FROM activities WHERE lead_id = :id', ['id' => $leadId]);
+
+            return Database::run('DELETE FROM leads WHERE id = :id', ['id' => $leadId])->rowCount() > 0;
+        });
     }
 
     public static function reassign(int $leadId, int $newOwnerId, int $actorId): void
