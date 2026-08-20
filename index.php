@@ -69,6 +69,10 @@ try {
         $path === '/leads' => Controller::leads(),
         $path === '/leads/export' => Controller::leadsExport(),
         $path === '/leads/import' => Controller::leadsImport(),
+        // Named with real extensions so the browser and Excel both know what
+        // they just downloaded.
+        $path === '/leads/sample.csv' => Controller::leadsSample('csv'),
+        $path === '/leads/sample.json' => Controller::leadsSample('json'),
         $path === '/leads/bulk' && $method === 'POST' => Controller::leadsBulk(),
 
         $path === '/runs' => Controller::runs(),

@@ -29,7 +29,7 @@ $query = array_filter([
     'in_ghl' => $filters['in_ghl'] ?? '',
     'sort' => $filters['sort'] ?? '',
     'owner' => $isAdmin ? ($filters['user_id'] ?? '') : '',
-    'archived' => !empty($filters['include_archived']) ? '1' : '',
+    'archived' => $filters['archived'] ?? '',
     'run_id' => !empty($filters['run_id']) ? $filters['run_id'] : '',
 ], static fn ($v): bool => $v !== '' && $v !== null);
 
@@ -49,7 +49,11 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
         <h1>Leads</h1>
         <div class="sub">
             <?= number_format($total) ?> <?= $total === 1 ? 'lead' : 'leads' ?> match
-            <?= !empty($filters['include_archived']) ? ' (including archived)' : '' ?>
+            <?php if (!empty($filters['archived_only'])): ?>
+                — archived only
+            <?php elseif (!empty($filters['include_archived'])): ?>
+                (including archived)
+            <?php endif; ?>
         </div>
     </div>
     <div class="page-head-actions">
@@ -174,7 +178,8 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
             <label for="f-archived">Archived</label>
             <select id="f-archived" name="archived" data-autosubmit>
                 <option value="">Hidden</option>
-                <option value="1" <?= !empty($filters['include_archived']) ? 'selected' : '' ?>>Included</option>
+                <option value="1" <?= ($filters['archived'] ?? '') === '1' ? 'selected' : '' ?>>Included</option>
+                <option value="only" <?= ($filters['archived'] ?? '') === 'only' ? 'selected' : '' ?>>Only archived</option>
             </select>
         </div>
 
@@ -215,6 +220,8 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                         <option value="ghl">Push to GoHighLevel</option>
                     <?php endif; ?>
                     <option value="archive">Archive</option>
+                    <option value="restore">Unarchive</option>
+                    <option value="delete">Delete for good…</option>
                 </select>
                 <button type="submit" class="btn btn-sm btn-primary">Apply to selected</button>
             </div>

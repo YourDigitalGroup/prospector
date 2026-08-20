@@ -222,6 +222,18 @@ final class Controller
                 self::flash('success', 'Lead restored.');
                 break;
 
+            case 'delete':
+                // Deleting the lead we are looking at means the return URL is
+                // about to 404, so this one ignores it and goes to the list.
+                if (Leads::delete($id)) {
+                    self::flash('success', $lead['company'] . ' deleted.');
+                } else {
+                    self::flash('error', 'That lead was already gone.');
+                }
+                self::redirect('/leads');
+
+                // no break — redirect() exits
+
             case 'reassign':
                 if (!Auth::isAdmin()) {
                     self::forbidden();
@@ -380,6 +392,7 @@ final class Controller
         }
 
         $done = 0;
+        $deleted = 0;
         $failed = 0;
         $messages = [];
 
@@ -393,6 +406,15 @@ final class Controller
             if ($action === 'archive') {
                 Leads::archive($id, Auth::id());
                 $done++;
+            } elseif ($action === 'restore') {
+                Leads::restore($id, Auth::id());
+                $done++;
+            } elseif ($action === 'delete') {
+                if (Leads::delete($id)) {
+                    $deleted++;
+                } else {
+                    $failed++;
+                }
             } elseif ($action === 'ghl') {
                 $result = self::pushLeadToGhl($id);
                 if ($result['ok']) {
@@ -409,7 +431,12 @@ final class Controller
             }
         }
 
-        $summary = $done . ' ' . ($done === 1 ? 'lead' : 'leads') . ' updated';
+        // "Deleted" and "updated" are different enough that reporting them as
+        // one number would be misleading about what just happened.
+        $summary = $deleted > 0
+            ? $deleted . ' ' . ($deleted === 1 ? 'lead' : 'leads') . ' deleted'
+            : $done . ' ' . ($done === 1 ? 'lead' : 'leads') . ' updated';
+
         if ($failed > 0) {
             $summary .= ', ' . $failed . ' skipped';
             if ($messages !== []) {
@@ -417,7 +444,7 @@ final class Controller
             }
         }
 
-        self::flash($done > 0 ? 'success' : 'error', $summary . '.');
+        self::flash($done + $deleted > 0 ? 'success' : 'error', $summary . '.');
         self::redirect($back);
     }
 
@@ -670,6 +697,59 @@ final class Controller
                 $lead['ghl_contact_id'] !== null ? 'yes' : 'no',
                 Clock::display((string) $lead['created_at'], 'Y-m-d'),
             ]);
+        }
+
+        fclose($out);
+        exit;
+    }
+
+    /**
+     * Hand back an example import file — the fastest way to answer "what
+     * columns does it want?" is to let someone open one and look.
+     *
+     * The rows come from LeadImport so the headers are always the real field
+     * names, and both formats are built from the same data: a CSV and a JSON
+     * download of the same file describe the same thing.
+     */
+    public static function leadsSample(string $format): void
+    {
+        self::requireLogin();
+
+        $rows = LeadImport::sample();
+
+        if ($format === 'json') {
+            header('Content-Type: application/json; charset=utf-8');
+            header('Content-Disposition: attachment; filename="prospector-sample-leads.json"');
+
+            // Blank strings are dropped rather than shipped as "": an example
+            // should show what an omitted field looks like, which is omitted.
+            $clean = array_map(
+                static fn (array $row): array => array_filter(
+                    $row,
+                    static fn (string|int $value): bool => $value !== '' && $value !== null
+                ),
+                $rows
+            );
+
+            echo json_encode($clean, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="prospector-sample-leads.csv"');
+
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            exit;
+        }
+
+        // The BOM is what makes Excel open a UTF-8 CSV without mangling it, and
+        // this file exists to be opened in Excel.
+        fwrite($out, "\xEF\xBB\xBF");
+
+        fputcsv($out, array_keys($rows[0]));
+        foreach ($rows as $row) {
+            fputcsv($out, array_values($row));
         }
 
         fclose($out);
@@ -1120,6 +1200,14 @@ final class Controller
     /** @return array<string, mixed> */
     private static function leadFilters(): array
     {
+        // Three states, not two: hiding archived leads is the default, but
+        // "only archived" is how you find something to unarchive without
+        // wading through the working list.
+        $archived = Request::input('archived');
+        if (!in_array($archived, ['1', 'only'], true)) {
+            $archived = '';
+        }
+
         $filters = [
             'search' => Request::input('q'),
             'status' => Request::input('status'),
@@ -1128,7 +1216,9 @@ final class Controller
             'min_score' => Request::input('min_score'),
             'in_ghl' => Request::input('in_ghl'),
             'sort' => Request::input('sort', 'newest'),
-            'include_archived' => Request::bool('archived'),
+            'archived' => $archived,
+            'include_archived' => $archived !== '',
+            'archived_only' => $archived === 'only',
             'run_id' => Request::int('run_id'),
         ];
 
