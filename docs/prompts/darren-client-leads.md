@@ -52,9 +52,13 @@ nationally out of a small town, which makes them better prospects than their
 location suggests. Ask for the Marketing Manager or Director, the VP of Sales &
 Marketing, or the Owner.
 
-**5. Regional retail.** Multi-location regional retailers — furniture, appliance,
-farm and ranch, grocery, auto-adjacent. Multiple locations matter; that's what
-creates the media budget. Ask for the Owner, Marketing Director, or VP of Marketing.
+**5. Regional retail.** Multi-location regional retailers — grocery, farm and
+ranch, auto-adjacent, apparel, sporting goods. Multiple locations matter; that's
+what creates the media budget. Ask for the Owner, Marketing Director, or VP of
+Marketing.
+
+**Home retail — furniture, paint, flooring, appliance, lighting, kitchen and bath —
+is Sara's inside 100 miles of Sioux Falls.** See the boundary below.
 
 **Across all five:** you want the person with the budget authority to hire an
 agency. Marketing Director, CMO, or VP of Marketing first. Owner, CEO, or GM at
@@ -69,10 +73,30 @@ smaller organizations. Skip coordinators and specialists — they can't sign any
   one-location boutique, a school under about 1,000 students with no marketing staff.
   They can't sustain the spend.
 - **Outside the Upper Midwest footprint.**
+- **Home-related businesses inside 100 miles of Sioux Falls.** Those are Sara's —
+  see the boundary below.
 
 If an organization is the same vertical in the same market as a company that's
 obviously already a 44i client, flag it rather than dropping it — that's a judgment
 call for Scott, not for you.
+
+## The boundary with Sara
+
+Sara runs the home trades and retail within 100 driving miles of Sioux Falls —
+contractors and remodelers, specialty trades (HVAC, plumbing, electrical, roofing,
+windows), interior design and residential architecture, home retail (furniture,
+mattress, paint, flooring, lighting, appliance, kitchen and bath, outdoor living),
+and landscaping. The split is **category first, radius second**:
+
+- **Home-related and inside her radius → Sara's.** Don't prospect these. If you
+  come across a good one, hand it to her rather than dropping it.
+- **Home retail outside the ring is still yours**, under Regional retail. A
+  furniture chain in Fargo or Madison is a Darren lead.
+- **Your five verticals are yours at any distance**, including inside the ring. A
+  hospital in Brookings or a casino in Sioux City is not a home business.
+
+A company genuinely on the line gets flagged for Scott, not guessed at. Two people
+calling the same owner in the same week costs more than a missed lead.
 
 ## The three doors — pick one per lead, because it decides the pitch
 

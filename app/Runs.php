@@ -35,6 +35,16 @@ final class Runs
         7 => 'Mixed batch, no vertical emphasis',
     ];
 
+    private const HOME_ROTATION = [
+        1 => 'Mixed batch, lean remodelers and general contractors',
+        2 => 'Mixed batch, lean specialty trades — HVAC, plumbing, electrical, roofing',
+        3 => 'Mixed batch, lean interior design and residential architecture',
+        4 => 'Mixed batch, lean home retail — furniture, paint, flooring, lighting, kitchen and bath',
+        5 => 'Mixed batch, lean outdoor and exterior — landscaping, decks, pools, windows',
+        6 => 'Mixed batch, no vertical emphasis',
+        7 => 'Mixed batch, no vertical emphasis',
+    ];
+
     /** Metro rotation so geography moves day to day. */
     private const PARTNER_GEOS = [
         'Upper Midwest — South Dakota, North Dakota, Minnesota',
@@ -63,20 +73,46 @@ final class Runs
         'Upper Midwest — open, rotate metros not covered recently',
     ];
 
+    /**
+     * Every entry sits inside 100 driving miles of Sioux Falls, because the
+     * radius is the whole point of this loop — it is what keeps Sara and Darren
+     * off each other's prospects. The spec states the boundary as a hard rule;
+     * this rotation just moves the emphasis around inside it.
+     */
+    private const HOME_GEOS = [
+        'Sioux Falls and its ring — Brandon, Harrisburg, Tea, Dell Rapids, Canton',
+        'Siouxland — Sioux City, North Sioux City, Dakota Dunes, Le Mars, Sergeant Bluff',
+        'I-29 north — Brookings, Madison, Flandreau, Watertown',
+        'James River valley — Mitchell, Yankton, Vermillion, Parkston',
+        'Southwest Minnesota — Luverne, Pipestone, Worthington, Windom, Marshall',
+        'Northwest Iowa — Rock Rapids, Sheldon, Spencer, Spirit Lake, Storm Lake',
+        'Open — anywhere inside the 100-mile ring not covered recently',
+    ];
+
     public static function verticalFor(string $loop, ?DateTimeImmutable $when = null): string
     {
         $when ??= Clock::local();
         $dow = (int) $when->format('N');
 
-        return $loop === 'partner'
-            ? (self::PARTNER_ROTATION[$dow] ?? self::PARTNER_ROTATION[1])
-            : (self::CLIENT_ROTATION[$dow] ?? self::CLIENT_ROTATION[1]);
+        $rotation = match ($loop) {
+            'partner' => self::PARTNER_ROTATION,
+            'home' => self::HOME_ROTATION,
+            default => self::CLIENT_ROTATION,
+        };
+
+        return $rotation[$dow] ?? $rotation[1];
     }
 
     public static function geographyFor(string $loop, ?DateTimeImmutable $when = null): string
     {
         $when ??= Clock::local();
-        $list = $loop === 'partner' ? self::PARTNER_GEOS : self::CLIENT_GEOS;
+
+        $list = match ($loop) {
+            'partner' => self::PARTNER_GEOS,
+            'home' => self::HOME_GEOS,
+            default => self::CLIENT_GEOS,
+        };
+
         $index = ((int) $when->format('z')) % count($list);
 
         return $list[$index];
@@ -87,6 +123,7 @@ final class Runs
         return match ($loop) {
             'partner' => 'Partner Prospector',
             'client' => 'Client Prospector',
+            'home' => 'Home Prospector',
             default => 'No loop',
         };
     }

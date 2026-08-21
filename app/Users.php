@@ -13,8 +13,22 @@ final class Users
     public const LOOPS = [
         'partner' => 'Partner Prospector (whitelabel resellers)',
         'client' => 'Client Prospector (direct AOR clients)',
+        'home' => 'Home Prospector (home trades and retail, 100-mile radius)',
         'none' => 'No daily loop',
     ];
+
+    /**
+     * The loops that can actually run a batch — everything in LOOPS except
+     * 'none'. Kept here as the single source of truth because five callers used
+     * to carry their own copy of this list, which is one edit too many for
+     * adding a loop.
+     */
+    public const RUNNABLE_LOOPS = ['partner', 'client', 'home'];
+
+    public static function isRunnableLoop(string $loop): bool
+    {
+        return in_array($loop, self::RUNNABLE_LOOPS, true);
+    }
 
     /** @return list<array<string, mixed>> */
     public static function all(bool $activeOnly = false): array
