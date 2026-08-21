@@ -94,7 +94,7 @@ final class Api
 
         foreach ($users as $user) {
             $loop = (string) $user['loop'];
-            if (!in_array($loop, ['partner', 'client'], true)) {
+            if (!Users::isRunnableLoop($loop)) {
                 continue;
             }
 
@@ -161,7 +161,7 @@ final class Api
         }
 
         $loop = (string) ($payload['loop'] ?? $user['loop']);
-        if (!in_array($loop, ['partner', 'client'], true)) {
+        if (!Users::isRunnableLoop($loop)) {
             self::fail(422, 'That user has no prospecting loop assigned.');
         }
 

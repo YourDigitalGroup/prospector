@@ -24,7 +24,7 @@ final class Prospector
         $userId = (int) $user['id'];
         $loop = (string) $user['loop'];
 
-        if ($loop === 'none' || !in_array($loop, ['partner', 'client'], true)) {
+        if (!Users::isRunnableLoop($loop)) {
             return self::failure(null, 0, 0, $user['name'] . ' has no prospecting loop assigned.');
         }
 
@@ -198,7 +198,10 @@ final class Prospector
 
     public static function loopSpec(string $loop): string
     {
-        $file = __DIR__ . '/loops/' . ($loop === 'partner' ? 'partner' : 'client') . '.md';
+        // Whitelisted, not sanitised: $loop reaches here from a database column
+        // and an API payload, and this builds a filesystem path.
+        $name = Users::isRunnableLoop($loop) ? $loop : 'client';
+        $file = __DIR__ . '/loops/' . $name . '.md';
         $spec = is_file($file) ? (string) file_get_contents($file) : '';
 
         if (trim($spec) === '') {

@@ -1,16 +1,21 @@
 # Prospector
 
-Lead generation and lead management for 44i. Every weekday morning at 7:30 Central it runs
-Billy's and Darren's prospecting loops, stores the qualified leads, and emails each of them a
-brief they can work from their phone. Leads are managed in a dashboard, and can be pushed into
-GoHighLevel.
+Lead generation and lead management for 44i. Every weekday morning at 7:30 Central it runs each
+seller's prospecting loop, stores the qualified leads, and emails them a brief they can work from
+their phone. Leads are managed in a dashboard, and can be pushed into GoHighLevel.
 
-Two loops ship with it, both built from the prospecting specs already in use:
+Three loops ship with it, built from the prospecting specs already in use:
 
 | Loop | Owner | Finds |
 |---|---|---|
 | **Partner Prospector** | Billy | Whitelabel reseller partners — independent TV/radio broadcasters, traditional ad agencies, local publishers, OOH operators |
 | **Client Prospector** | Darren | Direct agency-of-record clients — healthcare, casinos, higher ed, ag, regional retail in the Upper Midwest |
+| **Home Prospector** | Sara | Home trades and retail within 100 miles of Sioux Falls — contractors, specialty trades, design, furniture/paint/flooring retail, outdoor |
+
+Darren's and Sara's loops overlap on paper, so the specs draw the line explicitly: home-related
+categories inside 100 miles of Sioux Falls are Sara's, home retail beyond that ring stays with
+Darren, and Darren's five verticals are his at any distance. A company on the line gets flagged for
+Scott rather than called twice.
 
 ---
 
@@ -111,16 +116,20 @@ and it means anyone who knows the address and the site URL can read their leads.
 already have `44i123` set, so if that trade stops being acceptable, tick **Requires a password**
 for them on the Users screen and nothing else has to change.
 
-Adding a fourth person later is a Users-screen job: name, email, pick a loop, done.
+Adding another person is a Users-screen job: name, email, pick a loop, done. A new *loop* needs a
+spec in `app/loops/`, an entry in `Users::LOOPS` and `Users::RUNNABLE_LOOPS`, and a rotation in
+`Runs` — see the `home` loop for the shape of it.
 
 ---
 
 ## How a batch works
 
 1. **Rotation.** The day of the week picks the vertical (Billy: Monday radio, Tuesday agencies,
-   Wednesday TV, Thursday publishers, Friday OOH; Darren: mixed with a rotating lean) and the day
-   of the year picks the geography, so consecutive batches never hammer the same market. A user can
-   be pinned to one region with the geography override on the Users screen.
+   Wednesday TV, Thursday publishers, Friday OOH; Darren and Sara: mixed with a rotating lean) and
+   the day of the year picks the geography, so consecutive batches never hammer the same market. A
+   user can be pinned to one region with the geography override on the Users screen — leave it blank
+   to let the rotation run, which is what Sara wants, since every entry in her rotation already sits
+   inside her radius.
 2. **Research.** One Claude call with web search and web fetch, working from the loop spec in
    `app/loops/`. Every company already delivered to that owner is passed in as an exclusion list,
    so a batch never repeats an earlier one. The output is the Markdown brief you see on the batch
@@ -304,7 +313,7 @@ app/
   Runs.php             batch records and the vertical/geography rotation
   Users.php  Auth.php  accounts and sign-in
   Mailer.php           the daily brief email
-  loops/               the two loop specifications, as Markdown
+  loops/               the loop specifications, one Markdown file per loop
   Support/             database, schema, settings, crypto, clock, views, markdown
 views/                 screens, partials, and the email template
 assets/                stylesheet, script, pickaxe mark

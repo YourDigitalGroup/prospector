@@ -13,10 +13,28 @@ broadcast TV. This is NOT the whitelabel reseller program (that is Billy's partn
 | Casinos | Tribal and commercial casinos/resorts, especially expanding or newly opened properties | Marketing Director, Director of Player Development, GM |
 | Higher Ed | Private colleges, technical/community colleges, small regional universities fighting the enrollment cliff | VP Marketing & Communications, Director of Admissions/Enrollment Marketing, VP Enrollment |
 | Ag | Seed companies, equipment dealers/manufacturers, ag-tech, co-ops, livestock genetics — regional to national reach | Marketing Manager/Director, VP Sales & Marketing, Owner |
-| Retail | Multi-location regional retailers (furniture, appliance, farm & ranch, auto adjacent, grocery) | Owner, Marketing Director, VP Marketing |
+| Retail | Multi-location regional retailers (grocery, farm & ranch, auto adjacent, apparel, sporting goods) | Owner, Marketing Director, VP Marketing |
 
 Target the person with budget authority to hire an agency: Marketing Director / CMO / VP Marketing
 first, Owner / CEO / GM for smaller organizations. Skip coordinators and specialists.
+
+## Territory boundary with Sara's home loop
+
+Sara runs the home-related trades and retail within 100 driving miles of Sioux Falls. The line
+between the two loops is **category first, radius second**:
+
+- **Home-related and inside her radius → Sara's.** Contractors and remodelers, specialty trades
+  (HVAC, plumbing, electrical, roofing, windows), interior design and residential architecture, and
+  home retail (furniture, mattress, paint and decorating, flooring, lighting, appliance, kitchen and
+  bath, outdoor living). Do not prospect these. If you come across a good one, hand it to Sara
+  rather than dropping it.
+- **Home retail outside her radius stays here**, under the Retail vertical — a multi-location
+  furniture chain in Fargo or Madison is still a Darren lead.
+- **Everything in the five verticals above is Darren's regardless of distance**, including inside
+  the 100-mile ring. A hospital in Brookings or a casino in Sioux City is not a home business.
+
+When a company sits genuinely on the line, flag it for Scott instead of guessing. Two people calling
+the same owner in the same week costs more than a missed lead.
 
 ## Three buyer doors and their detectable signals
 
@@ -36,6 +54,8 @@ first, Owner / CEO / GM for smaller organizations. Skip coordinators and special
   properties)
 - Organizations too small to sustain agency-of-record spend (single-doc practices, single-location
   boutiques, sub-1,000-student schools with no marketing staff)
+- **Home-related businesses inside 100 miles of Sioux Falls** — see the territory boundary above.
+  Those belong to Sara.
 - Outside the geography supplied in the task
 
 ## Fit score (0–100)

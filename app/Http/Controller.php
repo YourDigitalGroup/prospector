@@ -577,8 +577,10 @@ final class Controller
      */
     private static function storeImported(array $user, array $rows, bool $sendEmail): array
     {
+        // An upload still gets a run row to hang the leads off, and a user
+        // with no loop can still be uploaded to.
         $loop = (string) $user['loop'];
-        if (!in_array($loop, ['partner', 'client'], true)) {
+        if (!Users::isRunnableLoop($loop)) {
             $loop = 'partner';
         }
 
