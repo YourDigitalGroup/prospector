@@ -929,3 +929,17 @@ input[type="file"] {
 @media (prefers-reduced-motion: reduce) {
     .spinner { animation-duration: 2.4s; }
 }
+
+/* A sent email, shown as it went out — preserve the line breaks the sender
+   typed without rendering it in a monospace face they never chose. */
+.sent-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: inherit;
+    margin: 0;
+    padding: 11px 13px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+}

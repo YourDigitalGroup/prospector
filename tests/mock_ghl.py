@@ -214,6 +214,14 @@ class Handler(BaseHTTPRequestHandler):
                 FAILING.update(x for x in query.get("fail", []) if x)
             return self.send_json({"failing": sorted(FAILING)})
 
+        # Read-only dump of everything the stand-in has been told, so a test can
+        # assert on what actually reached the API rather than on what the app
+        # believes it sent. Before the auth check on purpose: it is test
+        # scaffolding, not part of the surface being imitated.
+        if path == "/__state":
+            with LOCK:
+                return self.send_json(STATE)
+
         if not self.authorised():
             return self.deny("Invalid Private Integration token.")
 
@@ -341,6 +349,9 @@ class Handler(BaseHTTPRequestHandler):
                     "direction": "outbound",
                     "messageType": payload.get("type", "SMS"),
                     "body": payload.get("message", ""),
+                    # Recorded so a test can assert the subject really reached
+                    # the API, not just that the app believed it sent one.
+                    "subject": payload.get("subject", ""),
                     "dateAdded": "2026-08-12T09:00:00Z",
                 })
                 conversation["lastMessageBody"] = payload.get("message", "")

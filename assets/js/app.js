@@ -112,9 +112,29 @@
         }
 
         // Long-running submits: show progress so nobody double-clicks a batch.
-        var busyLabel = form.getAttribute('data-busy');
+        // data-busy is read off the button first so one form can have a slow
+        // action and a fast one side by side.
+        var pressed = event.submitter;
+        var busyLabel = (pressed && pressed.getAttribute('data-busy')) || form.getAttribute('data-busy');
         if (busyLabel) {
-            var button = form.querySelector('[type="submit"]');
+            // A disabled control is not submitted, so disabling the button that
+            // was just pressed drops its name and value from the payload. Forms
+            // that decide what to do by which button was clicked would then
+            // silently take the default branch — which is how "draft one email"
+            // became "draft all six". Carry the value in a hidden field first.
+            var submitter = pressed;
+            if (submitter && submitter.name && !form.querySelector('[data-carried]')) {
+                var carry = document.createElement('input');
+                carry.type = 'hidden';
+                carry.name = submitter.name;
+                carry.value = submitter.value;
+                carry.setAttribute('data-carried', '');
+                form.appendChild(carry);
+            }
+
+            // Disable the button that was actually pressed, not the first one in
+            // the form — otherwise a second button stays live and clickable.
+            var button = submitter || form.querySelector('[type="submit"]');
             if (button) {
                 button.disabled = true;
                 button.dataset.originalText = button.textContent;

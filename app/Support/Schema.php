@@ -103,6 +103,32 @@ final class Schema
                 svalue TEXT NULL,
                 updated_at VARCHAR(25) NOT NULL
             ){$suffix}",
+
+            // One row per lead per cadence step. The opening email is step 1, so
+            // drafting one email and building a six-step cadence write to the
+            // same place rather than to two parallel systems.
+            //
+            // due_on is a local date rather than a timestamp: a cadence step is
+            // due on a day, and pinning it to an hour would only invent a
+            // precision the sender does not have.
+            "CREATE TABLE IF NOT EXISTS emails (
+                id {$id},
+                lead_id {$fk} NOT NULL,
+                user_id {$fk} NOT NULL,
+                step INTEGER NOT NULL,
+                day_offset INTEGER NOT NULL DEFAULT 0,
+                purpose VARCHAR(190) NULL,
+                subject VARCHAR(255) NULL,
+                body TEXT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'draft',
+                due_on VARCHAR(10) NULL,
+                approved_at VARCHAR(25) NULL,
+                sent_at VARCHAR(25) NULL,
+                error TEXT NULL,
+                model VARCHAR(60) NULL,
+                created_at VARCHAR(25) NOT NULL,
+                updated_at VARCHAR(25) NOT NULL
+            ){$suffix}",
         ];
 
         foreach ($tables as $sql) {
@@ -117,6 +143,11 @@ final class Schema
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_dedupe ON leads (user_id, company_key)',
             'CREATE INDEX IF NOT EXISTS idx_runs_user_date ON runs (user_id, run_date)',
             'CREATE INDEX IF NOT EXISTS idx_activities_lead ON activities (lead_id)',
+            // Unique so regenerating a cadence replaces each step in place. Two
+            // step 3s for one lead is not a state worth being able to reach.
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_emails_step ON emails (lead_id, step)',
+            'CREATE INDEX IF NOT EXISTS idx_emails_due ON emails (status, due_on)',
+            'CREATE INDEX IF NOT EXISTS idx_emails_owner ON emails (user_id, status)',
         ];
 
         foreach ($indexes as $sql) {

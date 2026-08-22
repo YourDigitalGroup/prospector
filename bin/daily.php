@@ -25,6 +25,7 @@ if (PHP_SAPI !== 'cli') {
 
 require dirname(__DIR__) . '/app/bootstrap.php';
 
+use Prospector\Emails;
 use Prospector\Prospector;
 use Prospector\Runs;
 use Prospector\Support\Background;
@@ -128,15 +129,40 @@ if ($dryRun) {
     exit(0);
 }
 
+// Send anything a person has already approved and that is due today.
+//
+// Above the engine and API-key checks on purpose: those govern researching new
+// leads. An external worker or a missing key must not silently stall outreach
+// that is already written and approved.
+$outreach = Emails::sendDue();
+$exitCode = 0;
+
+if ($outreach['sent'] > 0 || $outreach['failed'] > 0 || $outreach['held'] > 0) {
+    $say(sprintf(
+        '  mail  %d sent, %d failed, %d held.',
+        $outreach['sent'],
+        $outreach['failed'],
+        $outreach['held']
+    ));
+    foreach ($outreach['messages'] as $message) {
+        $say('        ' . $message);
+    }
+    if ($outreach['failed'] > 0) {
+        $exitCode = 1;
+    }
+}
+
 $engine = Settings::engine();
 
 if ($engine !== 'api') {
     $say(
         $engine === 'worker'
-            ? 'Engine is set to the external worker, which pulls its own assignment. Nothing to do here.'
-            : 'Engine is set to manual paste-in. Nothing runs on a schedule.'
+            ? 'Engine is set to the external worker, which pulls its own assignment. No batch to run here.'
+            : 'Engine is set to manual paste-in. No batch runs on a schedule.'
     );
-    exit(0);
+    // Not exit(0): a cadence email that failed to send above is still a failure
+    // worth reporting to whatever is reading this script's exit code.
+    exit($exitCode);
 }
 
 if (Settings::anthropicKey() === '') {
@@ -145,8 +171,6 @@ if (Settings::anthropicKey() === '') {
 }
 
 Background::extendLimits(3600);
-
-$exitCode = 0;
 
 foreach ($users as $user) {
     $existing = Runs::forUserOnDate((int) $user['id'], Clock::today());

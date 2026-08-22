@@ -234,6 +234,50 @@ spending a token.
 
 ---
 
+## Outreach
+
+Every lead can carry a six-email cadence, written from the reason it qualified — the buyer door, the
+evidence the researcher read, and the hook it wrote. **Outreach** in the sidebar is where cadences
+are built, reviewed and sent; the lead screen carries just the opening email, for when you are
+working one company rather than a list.
+
+| Step | Day | What it is for |
+|---|---|---|
+| 1 | 0 | Opener — the specific thing you noticed, one ask |
+| 2 | 3 | Proof — a comparable result in their own vertical |
+| 3 | 7 | Second angle — the same problem from a different side |
+| 4 | 14 | Nudge — three lines, one question |
+| 5 | 21 | Something useful — no ask at all |
+| 6 | 30 | Close the loop — permission to stop |
+
+Day offsets count from the day you **approve**, not from when the copy was written, so a cadence
+approved a fortnight after it was drafted still spaces itself out properly.
+
+Three rules are load-bearing:
+
+- **Nothing sends that a person has not approved**, and editing an approved email puts it back to
+  draft. Approval is of the exact words, and the words just changed. That is what makes approving a
+  hundred leads at once a defensible act rather than a leap of faith.
+- **`pattern` addresses are held back by the mass send.** They were inferred from a company's email
+  format and never confirmed. Sending one on purpose is a judgement call you can make from the lead;
+  a hundred at once is how a sending domain gets burned. Tick *Include unverified addresses* in the
+  bulk bar to override it deliberately.
+- **Archiving a lead stops its cadence.** Archiving means you have stopped working it, and mail that
+  kept going out afterwards would make that decision meaningless.
+
+Copy is written by one API call per lead that produces all six emails at once, with no web search —
+everything it needs is already on the lead row, and going back to the web would only invite
+unchecked facts. A whole cadence costs a fraction of a cent. Pick the model under **Settings →
+Model for outreach email copy** on how the writing reads, not on price.
+
+Sending goes through GoHighLevel, so a lead with no contact there is pushed on the way. Steps 2 to 6
+go out on their day when the scheduler runs — which happens whatever the batch is doing, since a
+missing API key or an external worker engine has nothing to do with mail somebody already approved.
+Weekends are honoured when weekday-only delivery is on: cold email on a Sunday is worse than cold
+email a day late. **Send due now** on the Outreach screen does the same thing on demand.
+
+---
+
 ## GoHighLevel
 
 Everyone connects their own sub-account under **GoHighLevel → Connection**: a Location ID and a
@@ -310,6 +354,8 @@ app/
   Api.php              /api/assignment and /api/import, for the external worker
   GoHighLevel.php      GoHighLevel API v2 client
   Leads.php            lead storage, filtering, dispositions, de-duplication
+  Outreach.php         the cadence spec and the copywriting call
+  Emails.php           email rows, the approve/send state machine, scheduled sends
   Runs.php             batch records and the vertical/geography rotation
   Users.php  Auth.php  accounts and sign-in
   Mailer.php           the daily brief email

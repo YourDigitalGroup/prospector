@@ -11,6 +11,7 @@ require __DIR__ . '/app/bootstrap.php';
 use Prospector\Api;
 use Prospector\Auth;
 use Prospector\Http\Controller;
+use Prospector\Http\Outbox;
 use Prospector\Http\Workspace;
 use Prospector\Support\Request;
 use Prospector\Support\View;
@@ -77,6 +78,14 @@ try {
 
         $path === '/runs' => Controller::runs(),
         $path === '/runs/start' && $method === 'POST' => Controller::runStart(),
+
+        // Outreach: cadence copy, review, and sending.
+        $path === '/outreach' => Outbox::index(),
+        $path === '/outreach/lead' => Outbox::lead(),
+        $path === '/outreach/build' && $method === 'POST' => Outbox::build(),
+        $path === '/outreach/approve' && $method === 'POST' => Outbox::approve(),
+        $path === '/outreach/send' && $method === 'POST' => Outbox::send(),
+        $path === '/outreach/step' && $method === 'POST' => Outbox::step(),
 
         // The GoHighLevel workspace. /ghl is the pipeline board; the old
         // read-only summary lives on at /ghl/summary.
