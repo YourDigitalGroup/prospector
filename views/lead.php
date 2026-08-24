@@ -12,6 +12,10 @@ use Prospector\Support\View;
  * @var list<array<string, mixed>> $owners
  * @var bool $ghlReady
  * @var array<string, mixed>|null $run
+ * @var array<string, mixed>|null $opener
+ * @var int $cadenceSteps
+ * @var array{ok: bool, reason: string} $deliverable
+ * @var bool $unverifiedEmail
  * @var string $csrf
  */
 
@@ -408,6 +412,105 @@ if (!empty($lead['evidence'])) {
                         </form>
                     <?php endif; ?>
                 </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h2>Opening email</h2>
+                <?php if ($opener !== null): ?>
+                    <span class="dim small">
+                        <?php if ((string) $opener['status'] === 'sent'): ?>
+                            sent <?= View::e(Clock::display((string) $opener['sent_at'])) ?>
+                        <?php elseif ((string) $opener['status'] === 'approved'): ?>
+                            approved, queued
+                        <?php elseif ((string) $opener['status'] === 'failed'): ?>
+                            failed
+                        <?php else: ?>
+                            draft
+                        <?php endif; ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+            <div class="card-body">
+                <?php if (!$deliverable['ok']): ?>
+                    <p class="muted small"><?= View::e($deliverable['reason']) ?></p>
+                    <p class="hint">Nothing to send to yet — dig for an address and this opens up.</p>
+
+                <?php elseif ($opener === null): ?>
+                    <p class="dim small">
+                        Written from why this one qualified — the door, the evidence, and the hook
+                        above. You get to read it before anything goes anywhere.
+                    </p>
+                    <form method="post" action="<?= View::e(View::url('outreach/build')) ?>"
+                          class="btn-row mt" data-busy="Writing…">
+                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                        <input type="hidden" name="ids[]" value="<?= (int) $lead['id'] ?>">
+                        <input type="hidden" name="only_missing" value="0">
+                        <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
+                        <button class="btn btn-primary btn-sm" type="submit" name="steps" value="first">
+                            <?php $name = 'mail'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                            Draft the opening email
+                        </button>
+                        <button class="btn btn-sm" type="submit" name="steps" value="all">
+                            Draft all <?= (int) $cadenceSteps ?>
+                        </button>
+                    </form>
+
+                <?php elseif ((string) $opener['status'] === 'sent'): ?>
+                    <label>Subject</label>
+                    <p><strong><?= View::e($opener['subject']) ?></strong></p>
+                    <pre class="sent-body mt"><?= View::e($opener['body']) ?></pre>
+                    <a class="btn btn-sm mt" href="<?= View::e(View::url('outreach/lead', ['id' => (int) $lead['id']])) ?>">
+                        See the rest of the cadence
+                    </a>
+
+                <?php else: ?>
+                    <?php if ($unverifiedEmail): ?>
+                        <p class="hint">
+                            <?= View::e($lead['email']) ?> was inferred from the company's format,
+                            not confirmed. It may bounce.
+                        </p>
+                    <?php endif; ?>
+
+                    <?php if ((string) $opener['status'] === 'failed' && !empty($opener['error'])): ?>
+                        <div class="alert alert-error">
+                            <?php $name = 'alert'; $size = 17; require __DIR__ . '/partials/icon.php'; ?>
+                            <div><?= View::e($opener['error']) ?></div>
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="post" action="<?= View::e(View::url('outreach/step')) ?>">
+                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                        <input type="hidden" name="id" value="<?= (int) $opener['id'] ?>">
+                        <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
+
+                        <div class="field">
+                            <label for="opener-subject">Subject</label>
+                            <input type="text" id="opener-subject" name="subject"
+                                   value="<?= View::e($opener['subject']) ?>" maxlength="255">
+                        </div>
+
+                        <div class="field">
+                            <label for="opener-body">Body</label>
+                            <textarea id="opener-body" name="body" rows="8"><?= View::e($opener['body']) ?></textarea>
+                        </div>
+
+                        <div class="btn-row">
+                            <button class="btn btn-sm" type="submit" name="action" value="save">Save</button>
+                            <button class="btn btn-sm btn-primary" type="submit" name="action" value="send"
+                                    data-confirm="Send this to <?= View::e($lead['email']) ?> now?"
+                                    data-busy="Sending…">
+                                <?php $name = 'mail'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                                Approve &amp; send
+                            </button>
+                            <a class="btn btn-sm btn-ghost" style="margin-left:auto"
+                               href="<?= View::e(View::url('outreach/lead', ['id' => (int) $lead['id']])) ?>">
+                                Full cadence
+                            </a>
+                        </div>
+                    </form>
+                <?php endif; ?>
             </div>
         </div>
 

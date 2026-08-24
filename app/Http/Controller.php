@@ -6,11 +6,13 @@ namespace Prospector\Http;
 
 use Prospector\Auth;
 use Prospector\Claude;
+use Prospector\Emails;
 use Prospector\Enrich;
 use Prospector\GoHighLevel;
 use Prospector\LeadImport;
 use Prospector\Leads;
 use Prospector\Mailer;
+use Prospector\Outreach;
 use Prospector\Prospector;
 use Prospector\Runs;
 use Prospector\Support\Background;
@@ -172,6 +174,10 @@ final class Controller
             'digStatus' => $digState['status'],
             'dig' => $digState['findings'],
             'digMessage' => $digState['message'],
+            'opener' => Emails::forStep($id, 1),
+            'cadenceSteps' => Outreach::steps(),
+            'deliverable' => Outreach::deliverability($lead),
+            'unverifiedEmail' => Outreach::isUnverified($lead),
         ], $extra));
     }
 
@@ -931,6 +937,7 @@ final class Controller
             'envKey' => is_string(getenv('ANTHROPIC_API_KEY')) && getenv('ANTHROPIC_API_KEY') !== '',
             'workerToken' => Settings::workerToken(),
             'digModel' => Enrich::model(),
+            'outreachModel' => Outreach::model(),
             'workerLastSeen' => Settings::get('worker_last_seen'),
             'workerStale' => self::workerIsStale(),
             'scheduleText' => Mailer::scheduleDescription(),
@@ -965,6 +972,9 @@ final class Controller
                 : 'api',
             'dig_model' => in_array(Request::input('dig_model'), Enrich::MODELS, true)
                 ? Request::input('dig_model')
+                : 'claude-sonnet-5',
+            'outreach_model' => in_array(Request::input('outreach_model'), Outreach::MODELS, true)
+                ? Request::input('outreach_model')
                 : 'claude-sonnet-5',
         ];
 
@@ -1270,7 +1280,8 @@ final class Controller
         }
     }
 
-    private static function requireCsrf(): void
+    /** Public so the other HTTP controllers can use the one implementation. */
+    public static function requireCsrf(): void
     {
         if (!Auth::verifyCsrf(Request::raw('csrf'))) {
             http_response_code(419);

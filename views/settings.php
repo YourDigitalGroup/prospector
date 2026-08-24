@@ -138,6 +138,23 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
                     </div>
 
                     <div class="field">
+                        <label for="outreach_model">Model for outreach email copy</label>
+                        <select id="outreach_model" name="outreach_model">
+                            <?php foreach (\Prospector\Outreach::MODELS as $option): ?>
+                                <option value="<?= View::e($option) ?>" <?= $outreachModel === $option ? 'selected' : '' ?>>
+                                    <?= View::e($option) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="hint">
+                            One call per lead writes the whole cadence, and there is no web search
+                            involved, so this is the cheapest thing here — a six-email cadence costs
+                            well under a cent on any of these. Pick on how the copy reads, not on
+                            price: this is the writing everyone actually sees.
+                        </div>
+                    </div>
+
+                    <div class="field">
                         <label for="anthropic_api_key">API key</label>
                         <input type="password" id="anthropic_api_key" name="anthropic_api_key"
                                autocomplete="new-password"

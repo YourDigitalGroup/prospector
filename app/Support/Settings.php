@@ -114,6 +114,18 @@ final class Settings
         self::$cache = null;
     }
 
+    /**
+     * Remove a setting entirely.
+     *
+     * Different from setting it to '': absent means "no value", which is what a
+     * transient marker wants when the thing it was marking is over.
+     */
+    public static function forget(string $key): void
+    {
+        Database::run('DELETE FROM settings WHERE skey = :k', ['k' => $key]);
+        self::$cache = null;
+    }
+
     /** @param array<string, string> $values */
     public static function setMany(array $values): void
     {

@@ -50,6 +50,23 @@ final class Clock
         return self::local()->format('Y-m-d');
     }
 
+    /**
+     * Shift a business date by whole days.
+     *
+     * Date arithmetic rather than adding seconds, so a cadence step lands on the
+     * intended day even when the offset crosses a daylight-saving change.
+     */
+    public static function addDays(string $date, int $days): string
+    {
+        $start = DateTimeImmutable::createFromFormat('!Y-m-d', $date, self::timezone());
+
+        if ($start === false) {
+            $start = self::local();
+        }
+
+        return $start->modify(($days >= 0 ? '+' : '-') . abs($days) . ' days')->format('Y-m-d');
+    }
+
     /** Render a stored UTC timestamp in the business timezone. */
     public static function display(?string $utc, string $format = 'M j, Y g:ia'): string
     {

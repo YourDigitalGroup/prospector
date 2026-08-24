@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/app/bootstrap.php';
 
+use Prospector\Emails;
 use Prospector\Prospector;
 use Prospector\Support\Background;
 use Prospector\Support\Clock;
@@ -63,6 +64,44 @@ $withinWindow = static function () use ($now, $targetHour, $targetMinute): bool 
 
 $lines = [];
 $lines[] = 'Prospector cron — ' . $now->format('D, M j Y g:i a T');
+
+/**
+ * Cadence emails first, and deliberately before every early exit below.
+ *
+ * A queued email is due on its day whatever the batch is doing: the delivery
+ * window, the engine setting and the Anthropic key are all about researching
+ * new leads, and none of them should be able to silently stall outreach that
+ * a person already approved.
+ *
+ * Weekends are the one exception that is honoured. Sending cold email on a
+ * Sunday is worse than sending it a day late, so when weekday-only delivery is
+ * on, due steps wait for Monday.
+ */
+if ($weekdaysOnly && Clock::isWeekend($now) && !$force) {
+    $lines[] = 'Weekend — queued outreach waits for a weekday.';
+} else {
+    $outreach = Emails::sendDue();
+
+    if ($outreach['sent'] > 0 || $outreach['failed'] > 0 || $outreach['held'] > 0) {
+        $lines[] = sprintf(
+            'Outreach: %d sent, %d failed, %d held (archived lead).',
+            $outreach['sent'],
+            $outreach['failed'],
+            $outreach['held']
+        );
+        foreach ($outreach['messages'] as $message) {
+            $lines[] = '  - ' . $message;
+        }
+        Background::log(sprintf(
+            'Cron outreach: %d sent, %d failed, %d held.',
+            $outreach['sent'],
+            $outreach['failed'],
+            $outreach['held']
+        ));
+    } else {
+        $lines[] = 'Outreach: nothing due.';
+    }
+}
 
 if (!$force) {
     if ($weekdaysOnly && Clock::isWeekend($now)) {

@@ -1,6 +1,7 @@
 <?php
 
 use Prospector\Auth;
+use Prospector\Emails;
 use Prospector\Leads;
 use Prospector\Support\View;
 use Prospector\Users;
@@ -21,6 +22,10 @@ $scopeUserId = $isAdmin ? null : (int) ($user['id'] ?? 0);
 $openLeads = Leads::count(['user_id' => $scopeUserId, 'open_only' => true]);
 $newLeads = Leads::count(['user_id' => $scopeUserId, 'status' => 'new']);
 
+// Emails whose day has come and which nobody has sent yet. Worth a badge:
+// an approved cadence that silently stops is the failure mode here.
+$dueEmails = Emails::counts($scopeUserId)['due'];
+
 $nav = [
     'Prospect' => [
         ['path' => '/dashboard', 'label' => 'Home', 'icon' => 'home'],
@@ -28,6 +33,7 @@ $nav = [
     ],
     'Pipeline' => [
         ['path' => '/runs', 'label' => 'Daily batches', 'icon' => 'zap'],
+        ['path' => '/outreach', 'label' => 'Outreach', 'icon' => 'mail', 'count' => $dueEmails > 0 ? $dueEmails : null],
     ],
     // The GoHighLevel workspace. Its own group because these are the screens
     // Billy and Darren live in once a lead is in play, not somewhere they dip
