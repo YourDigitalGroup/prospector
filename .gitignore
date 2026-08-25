@@ -10,6 +10,10 @@
 !/storage/logs/.gitkeep
 /storage/cache/*
 !/storage/cache/.gitkeep
+# Session files. Never committed, and so never deployed either — they are
+# per-server state, and one of them is a live sign-in.
+/storage/sessions/*
+!/storage/sessions/.gitkeep
 
 # OS and editor noise
 .DS_Store

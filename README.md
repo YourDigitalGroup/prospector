@@ -116,6 +116,13 @@ and it means anyone who knows the address and the site URL can read their leads.
 already have `44i123` set, so if that trade stops being acceptable, tick **Requires a password**
 for them on the Users screen and nothing else has to change.
 
+**A sign-in lasts 30 days**, and every visit pushes that back out to a full month, so opening the
+tool once a week means never signing in again. Session files live in `storage/sessions` rather than
+the host's shared directory — on shared hosting that directory is swept on whatever lifetime the
+*other* site configured, typically 24 minutes, which would silently expire a month-long cookie. The
+flip side of a long session is that a signed-in browser stays signed in: on a shared machine, use
+**Sign out** rather than closing the tab.
+
 Adding another person is a Users-screen job: name, email, pick a loop, done. A new *loop* needs a
 spec in `app/loops/`, an entry in `Users::LOOPS` and `Users::RUNNABLE_LOOPS`, and a rotation in
 `Runs` — see the `home` loop for the shape of it.
