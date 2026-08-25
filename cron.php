@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/app/bootstrap.php';
 
+use Prospector\Automations;
 use Prospector\Emails;
 use Prospector\Prospector;
 use Prospector\Support\Background;
@@ -100,6 +101,22 @@ if ($weekdaysOnly && Clock::isWeekend($now) && !$force) {
         ));
     } else {
         $lines[] = 'Outreach: nothing due.';
+    }
+
+    // Catch up the state-based automation rules. Safe to re-run, so a rule
+    // added today picks up leads that arrived last week without a backfill.
+    $swept = Automations::sweep();
+    if ($swept['enrolled'] > 0 || $swept['failed'] > 0) {
+        $lines[] = sprintf(
+            'Automations: %d enrolled, %d failed.',
+            $swept['enrolled'],
+            $swept['failed']
+        );
+        Background::log(sprintf(
+            'Cron automations: %d enrolled, %d failed.',
+            $swept['enrolled'],
+            $swept['failed']
+        ));
     }
 }
 

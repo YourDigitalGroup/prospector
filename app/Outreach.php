@@ -37,14 +37,44 @@ final class Outreach
         6 => ['day' => 30, 'purpose' => 'Close the loop — permission to stop'],
     ];
 
-    /** Models offered for writing copy, cheapest first. */
-    public const MODELS = ['claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5'];
+    /**
+     * Models offered for writing copy, cheapest first.
+     *
+     * `local` is the machine configured under Settings → Local model. Copy is
+     * the right job to hand it: there is no web search involved and no research
+     * to get wrong, so the only question is whether the writing reads well —
+     * which you can judge by reading it. It also costs nothing.
+     */
+    public const LOCAL = 'local';
+    public const MODELS = [self::LOCAL, 'claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-5'];
 
     public static function model(): string
     {
         $model = Settings::get('outreach_model', 'claude-sonnet-5');
 
-        return in_array($model, self::MODELS, true) ? $model : 'claude-sonnet-5';
+        if (!in_array($model, self::MODELS, true)) {
+            return 'claude-sonnet-5';
+        }
+
+        // Selected but never set up, or since cleared: fall back rather than
+        // failing every build with a configuration error.
+        if ($model === self::LOCAL && !LocalModel::isConfigured()) {
+            return 'claude-sonnet-5';
+        }
+
+        return $model;
+    }
+
+    /** What to call the chosen model on screen. */
+    public static function modelLabel(string $model): string
+    {
+        if ($model !== self::LOCAL) {
+            return $model;
+        }
+
+        $local = LocalModel::configured();
+
+        return $local === null ? 'local model (not set up)' : 'local · ' . $local->model();
     }
 
     public static function steps(): int
@@ -151,14 +181,26 @@ final class Outreach
         }
 
         $model = self::model();
+        $system = self::SYSTEM . "\n\n=== WHO YOU ARE ===\n\n" . self::positioning($owner);
+        $brief = self::brief($lead, $owner, $steps);
+        $schema = self::schema($steps);
 
         try {
-            $claude = new Claude($model, 'low');
-            $result = $claude->extract(
-                self::SYSTEM . "\n\n=== WHO YOU ARE ===\n\n" . self::positioning($owner),
-                self::brief($lead, $owner, $steps),
-                self::schema($steps)
-            );
+            if ($model === self::LOCAL) {
+                $local = LocalModel::configured();
+                if ($local === null) {
+                    throw new RuntimeException(
+                        'The local model is selected but not set up. Add its address and model name '
+                        . 'under Settings.'
+                    );
+                }
+
+                // Room for six emails plus whatever a reasoning model thinks out
+                // loud on the way.
+                $result = $local->json($system, $brief, $schema, 600 * count($steps) + 2000);
+            } else {
+                $result = (new Claude($model, 'low'))->extract($system, $brief, $schema);
+            }
         } catch (Throwable $e) {
             return ['ok' => false, 'emails' => [], 'message' => $e->getMessage(), 'cost' => null];
         }
@@ -181,10 +223,13 @@ final class Outreach
                 ? 'Wrote the opening email.'
                 : 'Wrote ' . count($emails) . ' emails.',
             'cost' => [
-                'model' => $model,
+                'model' => self::modelLabel($model),
                 'input_tokens' => $result['input_tokens'],
                 'output_tokens' => $result['output_tokens'],
-                'dollars' => Claude::estimateCost($model, $result['input_tokens'], $result['output_tokens']),
+                // Your own hardware bills nobody.
+                'dollars' => $model === self::LOCAL
+                    ? 0.0
+                    : Claude::estimateCost($model, $result['input_tokens'], $result['output_tokens']),
             ],
         ];
     }

@@ -535,6 +535,87 @@ final class GoHighLevel
     }
 
     /**
+     * Take a contact back out of an automation.
+     *
+     * The counterpart to enrolling, and not optional: adding a hundred people
+     * to the wrong workflow is a mistake somebody will make, and without this
+     * the only fix is clicking through GoHighLevel one contact at a time.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function removeFromWorkflow(string $contactId, string $workflowId): array
+    {
+        $response = $this->request(
+            'DELETE',
+            '/contacts/' . rawurlencode($contactId) . '/workflow/' . rawurlencode($workflowId)
+        );
+
+        return [
+            'ok' => $response['ok'],
+            'message' => $response['ok'] ? 'Removed from the automation' : $response['error'],
+        ];
+    }
+
+    /**
+     * The whole thread for one contact — every channel, oldest last.
+     *
+     * GoHighLevel keeps a contact's email and SMS in separate conversations, so
+     * a rep looking at "the conversation" is really looking at two or three.
+     * This stitches them into one list, because the question being asked is
+     * "what have we said to this person", not "what is in conversation X".
+     *
+     * @return array{ok: bool, messages: list<array<string, mixed>>, conversations: int, error: string}
+     */
+    public function threadFor(string $contactId, int $limit = 50): array
+    {
+        $found = $this->conversations($contactId, 20);
+
+        if (!$found['ok']) {
+            return ['ok' => false, 'messages' => [], 'conversations' => 0, 'error' => $found['error']];
+        }
+
+        $messages = [];
+        $errors = [];
+
+        foreach ($found['conversations'] as $conversation) {
+            $id = (string) ($conversation['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+
+            $batch = $this->messages($id, $limit);
+            if (!$batch['ok']) {
+                $errors[] = $batch['error'];
+                continue;
+            }
+
+            foreach ($batch['messages'] as $message) {
+                $message['conversationId'] = $id;
+                $messages[] = $message;
+            }
+        }
+
+        // Newest first, which is how the API returns each conversation and how
+        // the screens read. Undated messages sort last rather than jumping to
+        // the top on a timestamp of 0.
+        usort($messages, static function (array $a, array $b): int {
+            $left = strtotime((string) ($a['dateAdded'] ?? '')) ?: 0;
+            $right = strtotime((string) ($b['dateAdded'] ?? '')) ?: 0;
+
+            return $right <=> $left;
+        });
+
+        return [
+            // A contact with no conversations yet is a success with nothing in
+            // it, not a failure.
+            'ok' => $messages !== [] || $errors === [],
+            'messages' => array_slice($messages, 0, $limit),
+            'conversations' => count($found['conversations']),
+            'error' => $messages === [] && $errors !== [] ? $errors[0] : '',
+        ];
+    }
+
+    /**
      * Conversation AI agents. Read-only here on purpose: the public API covers
      * creating and configuring agents, but nothing documented turns a bot on or
      * off for one contact or conversation, which is what a rep would actually

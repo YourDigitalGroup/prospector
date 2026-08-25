@@ -106,11 +106,14 @@ try {
         $path === '/ghl/task' && $method === 'POST' => Workspace::task(),
         $path === '/ghl/send' && $method === 'POST' => Workspace::send(),
         $path === '/ghl/enroll' && $method === 'POST' => Workspace::enroll(),
+        $path === '/ghl/rule' && $method === 'POST' => Workspace::rule(),
+        $path === '/ghl/sweep' && $method === 'POST' => Workspace::sweep(),
 
         $path === '/settings' => Controller::settings(),
         $path === '/settings/test/anthropic' && $method === 'POST' => Controller::settingsTest('anthropic'),
         $path === '/settings/test/ghl' && $method === 'POST' => Controller::settingsTest('ghl'),
         $path === '/settings/test/email' && $method === 'POST' => Controller::settingsTest('email'),
+        $path === '/settings/test/local' && $method === 'POST' => Controller::settingsTest('local'),
 
         $path === '/users' => Controller::users(),
         $path === '/users/save' && $method === 'POST' => Controller::usersSave(),

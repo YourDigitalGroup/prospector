@@ -329,6 +329,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"task": task})
 
         if match := re.fullmatch(r"/contacts/([^/]+)/workflow/([^/]+)", path):
+            if "enroll" in FAILING:
+                return self.deny("This token is missing workflows.write.", 403)
+            with LOCK:
+                STATE.setdefault("enrolments", []).append({
+                    "contactId": match.group(1),
+                    "workflowId": match.group(2),
+                })
             return self.send_json({"succeded": True, "contactId": match.group(1)})
 
         if path == "/conversations/messages":
@@ -361,6 +368,27 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"opportunity": {"id": "o_new"}})
 
         return self.send_json({"message": f"No mock route for POST {path}"}, 404)
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        url = urlparse(self.path)
+
+        if not self.authorised():
+            return self.deny("Invalid Private Integration token.")
+
+        if match := re.fullmatch(r"/contacts/([^/]+)/workflow/([^/]+)", url.path):
+            contact, workflow = match.group(1), match.group(2)
+            with LOCK:
+                before = len(STATE.get("enrolments", []))
+                STATE["enrolments"] = [
+                    e for e in STATE.get("enrolments", [])
+                    if not (e["contactId"] == contact and e["workflowId"] == workflow)
+                ]
+                removed = before - len(STATE["enrolments"])
+            if removed == 0:
+                return self.send_json({"message": "Contact is not in that workflow"}, 404)
+            return self.send_json({"succeded": True})
+
+        return self.send_json({"message": f"No mock route for DELETE {url.path}"}, 404)
 
     def do_PUT(self) -> None:  # noqa: N802
         path = urlparse(self.path).path

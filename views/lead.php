@@ -16,6 +16,10 @@ use Prospector\Support\View;
  * @var int $cadenceSteps
  * @var array{ok: bool, reason: string} $deliverable
  * @var bool $unverifiedEmail
+ * @var list<array<string, mixed>> $thread
+ * @var string|null $threadError
+ * @var list<array<string, mixed>> $workflows
+ * @var list<array<string, mixed>> $enrolments
  * @var string $csrf
  */
 
@@ -513,6 +517,129 @@ if (!empty($lead['evidence'])) {
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ($lead['ghl_contact_id'] !== null): ?>
+            <div class="card">
+                <div class="card-head">
+                    <h2>Conversation</h2>
+                    <span class="dim small">
+                        <?= $thread === [] ? 'nothing yet' : count($thread) . ' message' . (count($thread) === 1 ? '' : 's') ?>
+                        · from GoHighLevel
+                    </span>
+                </div>
+                <div class="card-body">
+                    <?php if ($threadError !== null): ?>
+                        <div class="alert alert-error">
+                            <?php $name = 'alert'; $size = 17; require __DIR__ . '/partials/icon.php'; ?>
+                            <div><?= View::e($threadError) ?></div>
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reply')) ?>"
+                          class="mb" data-busy="Sending…"
+                          data-confirm="Send this now? It goes straight to the contact.">
+                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                        <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
+                        <div class="field">
+                            <textarea name="body" rows="3" placeholder="Reply…" required></textarea>
+                        </div>
+                        <div class="btn-row">
+                            <select name="channel" aria-label="Send as" style="width:auto">
+                                <option value="Email">Email</option>
+                                <option value="SMS">Text</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <?php $name = 'mail'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                                Send reply
+                            </button>
+                        </div>
+                    </form>
+
+                    <?php if ($thread === []): ?>
+                        <p class="muted small">
+                            No messages with this contact yet. Anything sent from here or from a
+                            cadence shows up in this thread.
+                        </p>
+                    <?php else: ?>
+                        <hr class="divider">
+                        <ul class="thread">
+                            <?php foreach ($thread as $message): ?>
+                                <?php
+                                $inbound = strtolower((string) ($message['direction'] ?? '')) === 'inbound';
+                                $type = (string) ($message['messageType'] ?? $message['type'] ?? '');
+                                ?>
+                                <li class="thread-msg <?= $inbound ? 'is-in' : 'is-out' ?>">
+                                    <div class="thread-meta">
+                                        <strong><?= $inbound ? View::e($lead['decision_maker'] ?: $lead['company']) : 'Us' ?></strong>
+                                        <?php if ($type !== ''): ?>
+                                            <span class="badge badge-neutral"><?= View::e($type) ?></span>
+                                        <?php endif; ?>
+                                        <span class="muted"><?= View::e(Clock::display((string) ($message['dateAdded'] ?? ''), 'M j, g:ia')) ?></span>
+                                    </div>
+                                    <?php if (!empty($message['subject'])): ?>
+                                        <div class="thread-subject"><?= View::e($message['subject']) ?></div>
+                                    <?php endif; ?>
+                                    <div class="thread-body"><?= View::e(mb_strimwidth((string) ($message['body'] ?? ''), 0, 900, '…')) ?></div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h2>Automations</h2>
+                    <span class="dim small"><?= count($enrolments) ?> active</span>
+                </div>
+                <div class="card-body">
+                    <?php if ($enrolments !== []): ?>
+                        <ul class="listy mb">
+                            <?php foreach ($enrolments as $enrolment): ?>
+                                <li class="row" style="justify-content:space-between;gap:10px">
+                                    <span>
+                                        <?= View::e($enrolment['workflow_name'] ?: $enrolment['workflow_id']) ?>
+                                        <span class="muted small">
+                                            · <?= (string) $enrolment['source'] === 'rule' ? 'by a rule' : 'added by hand' ?>
+                                        </span>
+                                    </span>
+                                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/unenrol')) ?>"
+                                          class="inline-form">
+                                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                                        <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
+                                        <input type="hidden" name="workflow_id" value="<?= View::e($enrolment['workflow_id']) ?>">
+                                        <button class="linkish" type="submit">Remove</button>
+                                    </form>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+
+                    <?php if ($workflows === []): ?>
+                        <p class="muted small">
+                            No automations found in this GoHighLevel sub-account.
+                        </p>
+                    <?php else: ?>
+                        <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/enrol')) ?>"
+                              class="row" data-busy="Adding…">
+                            <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                            <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
+                            <select name="workflow_id" aria-label="Automation" required
+                                    onchange="this.form.workflow_name.value = this.options[this.selectedIndex].text">
+                                <option value="">Add to an automation…</option>
+                                <?php foreach ($workflows as $workflow): ?>
+                                    <option value="<?= View::e($workflow['id'] ?? '') ?>">
+                                        <?= View::e($workflow['name'] ?? $workflow['id'] ?? 'Unnamed') ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <input type="hidden" name="workflow_name" value="">
+                            <button class="btn btn-sm" type="submit">Add</button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <div class="card">
             <div class="card-head"><h2>History</h2></div>

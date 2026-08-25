@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Prospector\Http;
 
 use Prospector\Auth;
+use Prospector\Automations;
 use Prospector\Claude;
 use Prospector\Emails;
 use Prospector\Enrich;
 use Prospector\GoHighLevel;
 use Prospector\LeadImport;
 use Prospector\Leads;
+use Prospector\LocalModel;
 use Prospector\Mailer;
 use Prospector\Outreach;
 use Prospector\Prospector;
@@ -132,8 +134,50 @@ final class Controller
             'pages' => max(1, (int) ceil($total / self::PER_PAGE)),
             'facets' => Leads::facets(self::scopeUserId()),
             'owners' => Auth::isAdmin() ? Users::all() : [],
-            'ghlReady' => GoHighLevel::forUser(Auth::user()) !== null,
+            // Scoped the same way the workflow list is. An admin filtered to
+            // Darren is working in Darren's account, and gating the bulk actions
+            // on the admin's own connection — which they usually do not have —
+            // hid actions that would have worked perfectly well.
+            'ghlReady' => GoHighLevel::forUser(self::scopedOwner()) !== null,
+            'workflows' => self::workflowsForBulk(),
         ]);
+    }
+
+    /**
+     * Whose GoHighLevel account the current screen is working in.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function scopedOwner(): ?array
+    {
+        $scope = self::scopeUserId();
+
+        return $scope !== null ? Users::find($scope) : Auth::user();
+    }
+
+    /**
+     * Automations offered in the bulk bar.
+     *
+     * A workflow belongs to one GoHighLevel sub-account, so there is no single
+     * list that works across owners: offering Billy's automations for Darren's
+     * leads would fail one row at a time. So the list comes from whichever
+     * account the screen is actually scoped to — an admin filtered to Darren
+     * gets Darren's, and an admin looking at everybody gets their own, which is
+     * usually nothing. That is the honest answer: you cannot bulk-enrol across
+     * sub-accounts, and an empty list says so by leaving the option out.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function workflowsForBulk(): array
+    {
+        $client = GoHighLevel::forUser(self::scopedOwner());
+        if ($client === null) {
+            return [];
+        }
+
+        $result = $client->workflows();
+
+        return $result['ok'] ? $result['workflows'] : [];
     }
 
     public static function lead(int $id): void
@@ -178,7 +222,42 @@ final class Controller
             'cadenceSteps' => Outreach::steps(),
             'deliverable' => Outreach::deliverability($lead),
             'unverifiedEmail' => Outreach::isUnverified($lead),
-        ], $extra));
+            'enrolments' => Automations::enrolmentsFor($id),
+        ] + self::conversationFor($lead), $extra));
+    }
+
+    /**
+     * The GoHighLevel thread and workflow list for a lead.
+     *
+     * Both are live API calls, so they are only made when there is a contact to
+     * ask about and a connection to ask over. A lead that has never been pushed
+     * has nothing to show, and calling anyway would just slow the page down to
+     * render an empty box.
+     *
+     * @param array<string, mixed> $lead
+     * @return array<string, mixed>
+     */
+    private static function conversationFor(array $lead): array
+    {
+        $blank = ['thread' => [], 'threadError' => null, 'workflows' => []];
+
+        if (($lead['ghl_contact_id'] ?? null) === null) {
+            return $blank;
+        }
+
+        $client = GoHighLevel::forUser(Users::find((int) $lead['user_id']));
+        if ($client === null) {
+            return $blank;
+        }
+
+        $thread = $client->threadFor((string) $lead['ghl_contact_id'], 30);
+        $workflows = $client->workflows();
+
+        return [
+            'thread' => $thread['messages'],
+            'threadError' => $thread['ok'] ? null : $thread['error'],
+            'workflows' => $workflows['ok'] ? $workflows['workflows'] : [],
+        ];
     }
 
     public static function leadAction(int $id, string $action): void
@@ -250,6 +329,27 @@ final class Controller
 
             case 'ghl':
                 $result = self::pushLeadToGhl($id);
+                self::flash($result['ok'] ? 'success' : 'error', $result['message']);
+                break;
+
+            case 'reply':
+                self::replyToLead($lead);
+                break;
+
+            case 'enrol':
+                $result = Automations::enrol(
+                    $lead,
+                    Request::input('workflow_id'),
+                    Request::input('workflow_name'),
+                    'manual',
+                    null,
+                    Auth::id()
+                );
+                self::flash($result['ok'] ? 'success' : 'error', $result['message']);
+                break;
+
+            case 'unenrol':
+                $result = Automations::remove($lead, Request::input('workflow_id'), Auth::id());
                 self::flash($result['ok'] ? 'success' : 'error', $result['message']);
                 break;
 
@@ -383,6 +483,59 @@ final class Controller
         self::flash('success', 'Saved ' . implode(', ', array_keys($chosen)) . '.');
     }
 
+    /**
+     * Reply to a lead in the GoHighLevel thread.
+     *
+     * Deliberately not routed through the cadence: this is a person typing an
+     * answer to something that came back, which has nothing to do with the
+     * approved sequence and should not disturb it.
+     *
+     * @param array<string, mixed> $lead
+     */
+    private static function replyToLead(array $lead): void
+    {
+        $body = trim(Request::raw('body'));
+        $channel = strtoupper(Request::input('channel')) === 'SMS' ? 'SMS' : 'Email';
+
+        if ($body === '') {
+            self::flash('error', 'Write something first.');
+
+            return;
+        }
+
+        $contactId = trim((string) ($lead['ghl_contact_id'] ?? ''));
+        if ($contactId === '') {
+            self::flash('error', 'Push this lead to GoHighLevel before replying.');
+
+            return;
+        }
+
+        $client = GoHighLevel::forUser(Users::find((int) $lead['user_id']));
+        if ($client === null) {
+            self::flash('error', 'GoHighLevel is not connected for this owner.');
+
+            return;
+        }
+
+        $subject = Request::input('subject');
+        if ($channel === 'Email' && $subject === '') {
+            $subject = 'Re: ' . (string) $lead['company'];
+        }
+
+        $result = $client->sendMessage($contactId, $channel, $body, $subject);
+
+        if ($result['ok']) {
+            Leads::addActivity(
+                (int) $lead['id'],
+                Auth::id(),
+                'email',
+                strtolower($channel) . ' reply: ' . mb_strimwidth($body, 0, 120, '…')
+            );
+        }
+
+        self::flash($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
     public static function leadsBulk(): void
     {
         self::requireLogin();
@@ -402,6 +555,14 @@ final class Controller
         $failed = 0;
         $messages = [];
 
+        // Enrolling needs a workflow picked; without one there is nothing to
+        // add anybody to, and every row would fail identically.
+        $workflowId = Request::input('workflow_id');
+        if ($action === 'enrol' && $workflowId === '') {
+            self::flash('error', 'Pick an automation to add them to.');
+            self::redirect($back);
+        }
+
         foreach ($ids as $id) {
             $lead = Leads::find($id);
             if ($lead === null || !Auth::canAccessUser((int) $lead['user_id'])) {
@@ -420,6 +581,21 @@ final class Controller
                     $deleted++;
                 } else {
                     $failed++;
+                }
+            } elseif ($action === 'enrol') {
+                $result = Automations::enrol(
+                    $lead,
+                    $workflowId,
+                    Request::input('workflow_name'),
+                    'manual',
+                    null,
+                    Auth::id()
+                );
+                if ($result['ok']) {
+                    $done++;
+                } else {
+                    $failed++;
+                    $messages[$result['message']] = true;
                 }
             } elseif ($action === 'ghl') {
                 $result = self::pushLeadToGhl($id);
@@ -976,11 +1152,15 @@ final class Controller
             'outreach_model' => in_array(Request::input('outreach_model'), Outreach::MODELS, true)
                 ? Request::input('outreach_model')
                 : 'claude-sonnet-5',
+            // Normalised on the way in so however the address was typed, what
+            // is stored is what gets called.
+            'local_model_url' => LocalModel::normaliseUrl(Request::input('local_model_url')),
+            'local_model_name' => trim(Request::input('local_model_name')),
         ];
 
         // Secrets are only written when a new value is typed, so an empty field
         // never wipes a working credential.
-        foreach (['anthropic_api_key', 'smtp_password', 'ghl_token'] as $secret) {
+        foreach (['anthropic_api_key', 'smtp_password', 'ghl_token', 'local_model_key'] as $secret) {
             $new = Request::raw($secret);
             if ($new !== '') {
                 $values[$secret] = $new;
@@ -1024,6 +1204,13 @@ final class Controller
                 $result = $client === null
                     ? ['ok' => false, 'message' => 'Add a token and location ID first.']
                     : $client->testConnection();
+                break;
+
+            case 'local':
+                $local = LocalModel::configured();
+                $result = $local === null
+                    ? ['ok' => false, 'message' => 'Add the server address and a model name first.']
+                    : $local->test();
                 break;
 
             case 'email':

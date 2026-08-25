@@ -326,6 +326,22 @@ final class Emails
             'Sent step ' . (int) $email['step'] . ': ' . (string) $email['subject']
         );
 
+        // Two automation moments live here. The first email means the lead has
+        // actually been contacted; the last one means the sequence is spent and
+        // nobody replied, which is exactly when a longer nurture should pick
+        // them up. Re-read the lead so a rule sees the contact id that may have
+        // just been created above.
+        $fresh = Leads::find($leadId);
+        if ($fresh !== null) {
+            if ((int) $email['step'] === 1) {
+                Automations::apply('email_sent', $fresh, $actorId);
+            }
+
+            if (self::cadenceFinished($leadId)) {
+                Automations::apply('cadence_done', $fresh, $actorId);
+            }
+        }
+
         return ['ok' => true, 'message' => $lead['company'] . ': email sent.'];
     }
 
@@ -369,6 +385,30 @@ final class Emails
             'held' => $held,
             'messages' => array_slice($messages, 0, 5),
         ];
+    }
+
+    /**
+     * Every step of this lead's cadence has been sent or deliberately skipped.
+     *
+     * Skipped counts as done: a rep who skips the last two emails has still
+     * finished with the sequence, and holding the nurture back for a step that
+     * will never send would strand them.
+     */
+    public static function cadenceFinished(int $leadId): bool
+    {
+        $rows = self::forLead($leadId);
+
+        if (count($rows) < count(Outreach::CADENCE)) {
+            return false;
+        }
+
+        foreach ($rows as $row) {
+            if (!in_array((string) $row['status'], ['sent', 'skipped'], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function fail(int $id, string $reason): void

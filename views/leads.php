@@ -14,6 +14,7 @@ use Prospector\Support\View;
  * @var array{verticals: list<string>, doors: list<string>} $facets
  * @var list<array<string, mixed>> $owners
  * @var bool $ghlReady
+ * @var list<array<string, mixed>> $workflows
  * @var string $csrf
  */
 
@@ -219,10 +220,33 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                     <?php if ($ghlReady): ?>
                         <option value="ghl">Push to GoHighLevel</option>
                     <?php endif; ?>
+                    <?php if ($workflows !== []): ?>
+                        <option value="enrol">Add to an automation…</option>
+                    <?php endif; ?>
                     <option value="archive">Archive</option>
                     <option value="restore">Unarchive</option>
                     <option value="delete">Delete for good…</option>
                 </select>
+                <?php if ($workflows === [] && $isAdmin): ?>
+                    <span class="dim small">
+                        Filter to one owner to add leads to their automations —
+                        workflows belong to a sub-account.
+                    </span>
+                <?php endif; ?>
+
+                <?php if ($workflows !== []): ?>
+                    <select name="workflow_id" aria-label="Which automation" data-enrol-picker
+                            onchange="this.form.workflow_name.value = this.options[this.selectedIndex].text">
+                        <option value="">Which automation…</option>
+                        <?php foreach ($workflows as $workflow): ?>
+                            <option value="<?= View::e($workflow['id'] ?? '') ?>">
+                                <?= View::e($workflow['name'] ?? 'Untitled workflow') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="hidden" name="workflow_name" value="">
+                <?php endif; ?>
+
                 <button type="submit" class="btn btn-sm btn-primary">Apply to selected</button>
             </div>
 
