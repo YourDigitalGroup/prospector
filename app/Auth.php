@@ -91,7 +91,15 @@ final class Auth
             return;
         }
 
+        $wasJustCreated = $refreshed === 0;
         $_SESSION['cookie_refreshed_at'] = $now;
+
+        // A session created on this request already had its cookie sent by
+        // session_start, with these same parameters. Sending it again would put
+        // an identical duplicate Set-Cookie on every first response.
+        if ($wasJustCreated) {
+            return;
+        }
 
         setcookie(session_name(), session_id(), [
             'expires' => $now + $lifetime,
