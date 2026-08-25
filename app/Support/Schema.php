@@ -111,6 +111,41 @@ final class Schema
             // due_on is a local date rather than a timestamp: a cadence step is
             // due on a day, and pinning it to an hour would only invent a
             // precision the sender does not have.
+            // Rules that put a contact into a GoHighLevel automation without
+            // anyone clicking. Per owner, because workflows belong to a
+            // sub-account and Billy's do not exist in Darren's.
+            //
+            // The column is on_event rather than the obvious `trigger`, which is
+            // a reserved word in MySQL and would need quoting in every query
+            // that touches it.
+            "CREATE TABLE IF NOT EXISTS automation_rules (
+                id {$id},
+                user_id {$fk} NOT NULL,
+                workflow_id VARCHAR(120) NOT NULL,
+                workflow_name VARCHAR(190) NULL,
+                on_event VARCHAR(40) NOT NULL,
+                event_value VARCHAR(60) NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                enrolled_count INTEGER NOT NULL DEFAULT 0,
+                last_run_at VARCHAR(25) NULL,
+                created_at VARCHAR(25) NOT NULL,
+                updated_at VARCHAR(25) NOT NULL
+            ){$suffix}",
+
+            // Who is in what. Exists so a rule cannot enrol the same person
+            // twice — the sweep is deliberately re-runnable, and without this it
+            // would re-add everybody on every pass.
+            "CREATE TABLE IF NOT EXISTS enrolments (
+                id {$id},
+                lead_id {$fk} NOT NULL,
+                workflow_id VARCHAR(120) NOT NULL,
+                workflow_name VARCHAR(190) NULL,
+                source VARCHAR(20) NOT NULL DEFAULT 'manual',
+                rule_id {$fk} NULL,
+                removed_at VARCHAR(25) NULL,
+                created_at VARCHAR(25) NOT NULL
+            ){$suffix}",
+
             "CREATE TABLE IF NOT EXISTS emails (
                 id {$id},
                 lead_id {$fk} NOT NULL,
@@ -148,6 +183,8 @@ final class Schema
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_emails_step ON emails (lead_id, step)',
             'CREATE INDEX IF NOT EXISTS idx_emails_due ON emails (status, due_on)',
             'CREATE INDEX IF NOT EXISTS idx_emails_owner ON emails (user_id, status)',
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_enrolments_pair ON enrolments (lead_id, workflow_id)',
+            'CREATE INDEX IF NOT EXISTS idx_rules_owner ON automation_rules (user_id, active)',
         ];
 
         foreach ($indexes as $sql) {

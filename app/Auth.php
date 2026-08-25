@@ -9,6 +9,19 @@ use Prospector\Support\Database;
 
 final class Auth
 {
+    /**
+     * How long a sign-in lasts.
+     *
+     * Long on purpose: this is a tool three people open a few times a week, and
+     * being thrown back to the sign-in screen every visit is friction with no
+     * security benefit for accounts that sign in by email alone anyway. Anyone
+     * who wants the old behaviour back for a person can tick "Requires a
+     * password" on the Users screen.
+     */
+    private const SESSION_DAYS = 30;
+
+    private const SESSION_NAME = 'prospector_session';
+
     /** @var array<string, mixed>|null */
     private static ?array $user = null;
 
@@ -20,18 +33,79 @@ final class Auth
             return;
         }
 
-        $secure = (($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off')
-            || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+        $lifetime = self::SESSION_DAYS * 86400;
+
+        // Keep session files in our own directory.
+        //
+        // On shared hosting the default save path is shared, and garbage
+        // collection there runs on whatever gc_maxlifetime the *other* site
+        // configured — typically 24 minutes. A month-long cookie pointing at a
+        // file some neighbour's request already deleted is the failure this
+        // avoids, and it is invisible when it happens: the browser still has a
+        // session cookie, the server just no longer knows what it means.
+        $path = dirname(__DIR__) . '/storage/sessions';
+        if (!is_dir($path)) {
+            @mkdir($path, 0700, true);
+        }
+        if (is_dir($path) && is_writable($path)) {
+            session_save_path($path);
+        }
+
+        // The server has to keep the data at least as long as the browser keeps
+        // the cookie, or the cookie outlives what it refers to.
+        ini_set('session.gc_maxlifetime', (string) $lifetime);
+
+        $secure = self::isHttps();
 
         session_set_cookie_params([
-            'lifetime' => 0,
+            'lifetime' => $lifetime,
             'path' => '/',
             'httponly' => true,
             'secure' => $secure,
             'samesite' => 'Lax',
         ]);
-        session_name('prospector_session');
+        session_name(self::SESSION_NAME);
         session_start();
+
+        self::extendCookie($lifetime, $secure);
+    }
+
+    /**
+     * Push the cookie's expiry back out to a full term on every visit.
+     *
+     * PHP sets the cookie when the session is created and never again, so
+     * without this the month would count from the first sign-in and expire
+     * mid-use a month later regardless of how often the tool was opened. Re-sent
+     * only once a day, because a Set-Cookie on every single response is noise.
+     */
+    private static function extendCookie(int $lifetime, bool $secure): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE || headers_sent()) {
+            return;
+        }
+
+        $now = time();
+        $refreshed = (int) ($_SESSION['cookie_refreshed_at'] ?? 0);
+
+        if ($refreshed > $now - 86400) {
+            return;
+        }
+
+        $_SESSION['cookie_refreshed_at'] = $now;
+
+        setcookie(session_name(), session_id(), [
+            'expires' => $now + $lifetime,
+            'path' => '/',
+            'httponly' => true,
+            'secure' => $secure,
+            'samesite' => 'Lax',
+        ]);
+    }
+
+    private static function isHttps(): bool
+    {
+        return (($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off')
+            || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
     }
 
     /**

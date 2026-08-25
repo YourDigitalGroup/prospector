@@ -943,3 +943,14 @@ input[type="file"] {
     border-radius: 8px;
     color: var(--text);
 }
+
+/* A GoHighLevel thread on the lead screen. Inbound and outbound are told apart
+   by weight and a border rather than by chat bubbles — this is a record to
+   read, not a messaging app to live in. */
+.thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.thread-msg { padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); }
+.thread-msg.is-in { border-left: 3px solid var(--accent); }
+.thread-msg.is-out { opacity: .88; }
+.thread-meta { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 4px; }
+.thread-subject { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+.thread-body { font-size: 13px; white-space: pre-wrap; word-break: break-word; color: var(--text); }

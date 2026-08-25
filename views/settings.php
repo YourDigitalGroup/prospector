@@ -141,16 +141,21 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
                         <label for="outreach_model">Model for outreach email copy</label>
                         <select id="outreach_model" name="outreach_model">
                             <?php foreach (\Prospector\Outreach::MODELS as $option): ?>
-                                <option value="<?= View::e($option) ?>" <?= $outreachModel === $option ? 'selected' : '' ?>>
-                                    <?= View::e($option) ?>
+                                <?php $isLocal = $option === \Prospector\Outreach::LOCAL; ?>
+                                <option value="<?= View::e($option) ?>"
+                                    <?= $outreachModel === $option ? 'selected' : '' ?>
+                                    <?= $isLocal && !\Prospector\LocalModel::isConfigured() ? 'disabled' : '' ?>>
+                                    <?= View::e(\Prospector\Outreach::modelLabel($option)) ?><?=
+                                        $isLocal && !\Prospector\LocalModel::isConfigured() ? ' — set it up above' : '' ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                         <div class="hint">
                             One call per lead writes the whole cadence, and there is no web search
                             involved, so this is the cheapest thing here — a six-email cadence costs
-                            well under a cent on any of these. Pick on how the copy reads, not on
-                            price: this is the writing everyone actually sees.
+                            well under a cent on any of the hosted models, and nothing at all on the
+                            local one. Pick on how the copy reads, not on price: this is the writing
+                            everyone actually sees.
                         </div>
                     </div>
 
@@ -189,6 +194,64 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
                             formmethod="post">
                         Test the API key
                     </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h2>Local model</h2>
+                    <span class="dim small">account-wide · admin only</span>
+                </div>
+                <div class="card-body">
+                    <p class="dim">
+                        Any OpenAI-compatible server — Ollama, LM Studio, llama.cpp, vLLM. One
+                        machine for the whole account rather than a copy per person: it is one box
+                        on one network, and four copies of the address is four ways for it to be
+                        wrong. Only an admin can see or change this.
+                    </p>
+
+                    <div class="field">
+                        <label for="local_model_url">Server address</label>
+                        <input type="text" id="local_model_url" name="local_model_url"
+                               value="<?= View::e($settings['local_model_url'] ?? '') ?>"
+                               placeholder="http://mac-mini.local:11434/v1" spellcheck="false">
+                        <div class="hint">
+                            Ollama listens on <code>:11434/v1</code>, LM Studio on
+                            <code>:1234/v1</code>. Paste it however you have it — the scheme and a
+                            trailing <code>/chat/completions</code> are sorted out on save. The
+                            machine has to be reachable from this server, so a address like
+                            <code>localhost</code> only works if the model runs on the web host.
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="local_model_name">Model</label>
+                        <input type="text" id="local_model_name" name="local_model_name"
+                               value="<?= View::e($settings['local_model_name'] ?? '') ?>"
+                               placeholder="qwen3:8b" spellcheck="false">
+                        <div class="hint">Exactly as the server names it — <code>ollama list</code> prints them.</div>
+                    </div>
+
+                    <div class="field">
+                        <label for="local_model_key">API key <span class="muted" style="font-weight:500">(optional)</span></label>
+                        <input type="password" id="local_model_key" name="local_model_key"
+                               autocomplete="new-password"
+                               placeholder="<?= $secretSet('local_model_key') ? 'Saved — type a new key to replace it' : 'Most local servers need none' ?>">
+                        <div class="hint">
+                            Stored encrypted and never shown again. Ollama needs no key; LM Studio
+                            and anything behind a proxy usually do. Leaving it blank is a valid
+                            setup, not a missing one.
+                        </div>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn-sm" formaction="<?= View::e(View::url('settings/test/local')) ?>"
+                            formmethod="post" data-busy="Asking the model…">
+                        Test the connection
+                    </button>
+                    <span class="dim small" style="margin-left:auto">
+                        A cold model can take a minute to load on the first call.
+                    </span>
                 </div>
             </div>
 

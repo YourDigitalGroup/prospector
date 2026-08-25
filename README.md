@@ -116,6 +116,13 @@ and it means anyone who knows the address and the site URL can read their leads.
 already have `44i123` set, so if that trade stops being acceptable, tick **Requires a password**
 for them on the Users screen and nothing else has to change.
 
+**A sign-in lasts 30 days**, and every visit pushes that back out to a full month, so opening the
+tool once a week means never signing in again. Session files live in `storage/sessions` rather than
+the host's shared directory — on shared hosting that directory is swept on whatever lifetime the
+*other* site configured, typically 24 minutes, which would silently expire a month-long cookie. The
+flip side of a long session is that a signed-in browser stays signed in: on a shared machine, use
+**Sign out** rather than closing the tab.
+
 Adding another person is a Users-screen job: name, email, pick a loop, done. A new *loop* needs a
 spec in `app/loops/`, an entry in `Users::LOOPS` and `Users::RUNNABLE_LOOPS`, and a rotation in
 `Runs` — see the `home` loop for the shape of it.
@@ -278,6 +285,76 @@ email a day late. **Send due now** on the Outreach screen does the same thing on
 
 ---
 
+## The local model
+
+An account-wide connection to any OpenAI-compatible server — Ollama, LM Studio, llama.cpp, vLLM.
+**Settings → Local model**, which only an admin can reach: address, model name, and an optional API
+key stored encrypted and never shown again. One machine for the whole account rather than a copy per
+person, because it is one box on one network and four copies of the address is four ways for it to
+be wrong.
+
+Paste the address however you have it — `mac-mini.local:11434`, `http://mac-mini:11434/v1/`, or a
+full `/chat/completions` endpoint all normalise to the same thing on save. Most local servers need
+no key at all; leaving it blank is a valid setup, not a missing one.
+
+What it is used for today is **outreach copy**: pick it under *Model for outreach email copy* and a
+six-email cadence costs nothing instead of a fraction of a cent. Copywriting is the right job for it
+— no web search, no research to get wrong, and you can judge the result by reading it. Batches still
+go to the hosted API, which is where web search lives.
+
+Local models are messier than a hosted API, so the client copes: it pulls JSON out of a code fence,
+out of prose, and out from behind a `<think>` block, and reports what actually went wrong when it
+cannot. Selecting the local model and then clearing its settings falls back to Sonnet rather than
+failing every build.
+
+---
+
+## Automations
+
+Beyond pushing contacts, Prospector drives GoHighLevel's automations directly.
+
+**By hand** — every lead with a contact has an Automations panel: add to a workflow, and remove from
+one. Removing matters as much as adding, because enrolling a hundred people in the wrong workflow is
+a mistake somebody will make.
+
+**In bulk** — tick leads on the Leads screen and add them all at once. Workflows belong to a
+sub-account, so the list comes from whichever account the screen is scoped to; an admin looking at
+everybody's leads is told to filter to one owner rather than being offered a list that would fail
+one row at a time.
+
+**Automatically** — rules on the Automations screen, per owner:
+
+| When | What it means |
+|---|---|
+| Every new lead | Anyone who lands in this account, however they got here |
+| Fit score at least *n* | Only the strong ones |
+| Marked as *status* | A disposition is set — booked a meeting, for instance |
+| First outreach email sent | The moment they have actually been contacted |
+| Cadence finished | All six emails have gone and nobody replied |
+
+The status and email rules fire the instant the thing happens. The new-lead and score rules run as a
+**sweep** — from the scheduler, or on demand with *Run the rules now* — which is what makes a rule
+added today pick up last week's leads without a backfill. The sweep is safe to re-run: a unique
+index on (lead, workflow) is what stops it re-adding everybody every half hour.
+
+Every enrolment is written to the lead's history, so nothing joins an automation quietly. An
+archived lead is never swept in, and a lead taken out of a workflow by hand is not put back by the
+rule that first added it.
+
+---
+
+## Conversations
+
+The lead screen shows the real GoHighLevel thread — email and SMS stitched together in one list,
+since GoHighLevel keeps them as separate conversations and the question being asked is "what have we
+said to this person". There is a reply box for both channels; a reply is a person answering
+something, so it is deliberately kept out of the approved cadence rather than disturbing it.
+
+The Inbox filters by channel and by unread, and links each conversation back to the lead it belongs
+to instead of being a dead end.
+
+---
+
 ## GoHighLevel
 
 Everyone connects their own sub-account under **GoHighLevel → Connection**: a Location ID and a
@@ -355,6 +432,8 @@ app/
   GoHighLevel.php      GoHighLevel API v2 client
   Leads.php            lead storage, filtering, dispositions, de-duplication
   Outreach.php         the cadence spec and the copywriting call
+  LocalModel.php       the OpenAI-compatible client for a local model server
+  Automations.php      enrolment rules, the sweep, and who is in what
   Emails.php           email rows, the approve/send state machine, scheduled sends
   Runs.php             batch records and the vertical/geography rotation
   Users.php  Auth.php  accounts and sign-in

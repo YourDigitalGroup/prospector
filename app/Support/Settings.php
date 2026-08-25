@@ -19,6 +19,7 @@ final class Settings
         'ghl_token',
         'cron_token',
         'worker_token',
+        'local_model_key',
     ];
 
     private const DEFAULTS = [
@@ -48,6 +49,12 @@ final class Settings
         'batch_size' => '',
         'min_fit_score' => '',
         'effort' => 'high',
+        // The local model server. Account-wide rather than per user: it is one
+        // machine on one network, and four copies of the address is four ways
+        // for it to be wrong.
+        'local_model_url' => '',
+        'local_model_name' => '',
+        'local_model_key' => '',
     ];
 
     /** @var array<string, string>|null */
@@ -150,6 +157,23 @@ final class Settings
         }
 
         return self::get('anthropic_api_key');
+    }
+
+    /**
+     * The local model's key, which may also come from the environment.
+     *
+     * Most local servers want no key at all; LM Studio and a fronted vLLM do.
+     * Empty is a valid, working configuration, so nothing here treats it as
+     * missing.
+     */
+    public static function localModelKey(): string
+    {
+        $env = getenv('LOCAL_MODEL_API_KEY');
+        if (is_string($env) && $env !== '') {
+            return $env;
+        }
+
+        return self::get('local_model_key');
     }
 
     public static function cronToken(): string

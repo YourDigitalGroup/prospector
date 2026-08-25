@@ -26,6 +26,12 @@ Failure injection, so the error paths get exercised too:
     GET /__control?fail=off          back to normal
     GET /__calls                     how many calls have been made
 
+It also answers OpenAI-style `POST /v1/chat/completions`, so the same process
+stands in for a local model server (Ollama, LM Studio) as well. That path
+deliberately replies the way a local model actually does — the JSON wrapped in a
+code fence, after a visible thinking block — because coping with that is the
+whole reason LocalModel has its own parser.
+
 Run:  python3 tests/mock_anthropic.py 8791
 """
 
@@ -98,6 +104,51 @@ class Handler(BaseHTTPRequestHandler):
 
         self._send(404, {"error": "not found"})
 
+    def _openai(self, body):
+        mode = STATE["fail"]
+        STATE["fail"] = None
+
+        if mode == "500":
+            return self._send(500, {"error": {"message": "mock local server error"}})
+
+        # The connection probe asks for one word. Answering it with a cadence
+        # would make the Test button look like it worked for the wrong reason.
+        asked = " ".join(str(m.get("content", "")) for m in body.get("messages", []))
+        if "single word: ready" in asked:
+            return self._send(200, {
+                "id": "chatcmpl-mock",
+                "object": "chat.completion",
+                "model": body.get("model", "mock-local"),
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": "ready"},
+                             "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 1, "total_tokens": 13},
+            })
+
+        if mode == "notjson":
+            # A local model that ignored the instruction entirely.
+            content = "I would be happy to help you write those emails!"
+        elif mode == "empty":
+            content = json.dumps({"emails": []})
+        else:
+            # The realistic case: a thinking block, then a fenced object. If
+            # LocalModel cannot read this, it cannot read a real local model.
+            content = (
+                "<think>The brief says one ask per email, so keep it short.</think>\n"
+                "```json\n" + json.dumps(_openai_payload(body)) + "\n```"
+            )
+
+        return self._send(200, {
+            "id": "chatcmpl-mock",
+            "object": "chat.completion",
+            "model": body.get("model", "mock-local"),
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 900, "completion_tokens": 700, "total_tokens": 1600},
+        })
+
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
@@ -109,6 +160,10 @@ class Handler(BaseHTTPRequestHandler):
 
         STATE["calls"] += 1
         STATE["last_request"] = body
+
+        # OpenAI-compatible path: stand in for a local model server.
+        if "/chat/completions" in self.path:
+            return self._openai(body)
 
         if "/messages" not in self.path:
             return self._send(404, {"type": "error", "error": {"message": "unknown endpoint"}})
@@ -149,6 +204,36 @@ class Handler(BaseHTTPRequestHandler):
             **base,
             "content": [{"type": "text", "text": json.dumps(payload)}],
         })
+
+
+def _openai_payload(body):
+    """Steps come from the schema echoed into the system prompt."""
+    system = ""
+    user = ""
+    for message in body.get("messages", []):
+        if message.get("role") == "system":
+            system = str(message.get("content", ""))
+        elif message.get("role") == "user":
+            user = str(message.get("content", ""))
+
+    steps = [1]
+    found = re.search(r"one of: ([\d, ]+)", system)
+    if found:
+        steps = [int(n) for n in re.findall(r"\d+", found.group(1))]
+
+    company = "the company"
+    named = re.search(r"^Company: (.+)$", user, re.MULTILINE)
+    if named:
+        company = named.group(1).strip()
+
+    return {"emails": [
+        {
+            "step": step,
+            "subject": f"local step {step} for {company}"[:54],
+            "body": f"Local model copy for step {step}, written for {company}.\n\nSara",
+        }
+        for step in steps
+    ]}
 
 
 if __name__ == "__main__":

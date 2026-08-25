@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Prospector\Http;
 
 use Prospector\Auth;
+use Prospector\Automations;
 use Prospector\GoHighLevel;
+use Prospector\Leads;
 use Prospector\Support\Request;
 use Prospector\Support\View;
 use Prospector\Users;
@@ -197,12 +199,53 @@ final class Workspace
             self::promptToConnect($user);
         }
 
-        $result = $client->conversations('', 50);
+        $result = $client->conversations('', 100);
+        $channel = strtolower(Request::input('channel'));
+        $unreadOnly = Request::input('unread') === '1';
+
+        $conversations = $result['conversations'];
+
+        // Filtered here rather than in the API call: GoHighLevel's conversation
+        // search does not take a channel, and a client-side filter over 100 rows
+        // is cheaper than being wrong about what it supports.
+        $conversations = array_values(array_filter(
+            $conversations,
+            static function (array $c) use ($channel, $unreadOnly): bool {
+                if ($unreadOnly && (int) ($c['unreadCount'] ?? 0) === 0) {
+                    return false;
+                }
+
+                if ($channel === '' || $channel === 'all') {
+                    return true;
+                }
+
+                $type = strtolower((string) ($c['type'] ?? $c['lastMessageType'] ?? ''));
+
+                return $channel === 'email'
+                    ? str_contains($type, 'email')
+                    : !str_contains($type, 'email');
+            }
+        ));
+
+        // Match conversations back to the leads they belong to, so the inbox
+        // links somewhere useful instead of being a dead end.
+        $byContact = [];
+        foreach ($conversations as $conversation) {
+            $contactId = (string) ($conversation['contactId'] ?? '');
+            if ($contactId !== '') {
+                $byContact[$contactId] = true;
+            }
+        }
+        $leadsByContact = Leads::byGhlContactIds(array_keys($byContact));
 
         self::render('workspace/inbox', $user, [
             'title' => 'Inbox',
             'tab' => 'inbox',
-            'conversations' => $result['conversations'],
+            'conversations' => $conversations,
+            'total' => count($result['conversations']),
+            'channel' => $channel,
+            'unreadOnly' => $unreadOnly,
+            'leadsByContact' => $leadsByContact,
             'error' => $result['ok'] ? null : $result['error'],
         ]);
     }
@@ -223,6 +266,9 @@ final class Workspace
             'tab' => 'automations',
             'workflows' => $workflows,
             'agents' => $agents,
+            'rules' => Automations::rules((int) $user['id']),
+            'events' => Automations::EVENTS,
+            'statuses' => Leads::STATUSES,
         ]);
     }
 
@@ -393,6 +439,84 @@ final class Workspace
 
         Controller::flash($result['ok'] ? 'success' : 'error', $result['message']);
         Controller::redirect(self::link('/ghl/contact', $user, ['id' => $contactId]));
+    }
+
+    /**
+     * Create, pause, resume or delete an automatic enrolment rule.
+     *
+     * Rules belong to the owner whose leads they act on — a workflow lives in a
+     * sub-account, and Billy's automations do not exist in Darren's.
+     */
+    public static function rule(): void
+    {
+        [$user] = self::context(true);
+        self::csrf();
+
+        $action = Request::input('action');
+        $back = self::link('/ghl/automations', $user);
+
+        if ($action === 'add') {
+            $created = Automations::addRule(
+                (int) $user['id'],
+                Request::input('workflow_id'),
+                Request::input('workflow_name'),
+                Request::input('on_event'),
+                Request::input('event_value')
+            );
+
+            Controller::flash(
+                $created > 0 ? 'success' : 'error',
+                $created > 0
+                    ? 'Rule saved. It runs from now on, and the next scheduled sweep catches up any '
+                        . 'leads already on file that match.'
+                    : 'That rule needs an automation and a trigger.'
+            );
+
+            Controller::redirect($back);
+        }
+
+        $rule = Automations::rule(Request::int('rule_id'));
+
+        if ($rule === null || !Auth::canAccessUser((int) $rule['user_id'])) {
+            Controller::forbidden();
+        }
+
+        match ($action) {
+            'pause' => Automations::setRuleActive((int) $rule['id'], false),
+            'resume' => Automations::setRuleActive((int) $rule['id'], true),
+            'delete' => Automations::deleteRule((int) $rule['id']),
+            default => null,
+        };
+
+        Controller::flash('success', match ($action) {
+            'pause' => 'Rule paused. Nobody new gets added until you resume it.',
+            'resume' => 'Rule running again.',
+            'delete' => 'Rule deleted. Anyone already enrolled stays enrolled.',
+            default => 'Nothing changed.',
+        });
+
+        Controller::redirect($back);
+    }
+
+    /**
+     * Run the state-based rules on demand rather than waiting for the scheduler.
+     */
+    public static function sweep(): void
+    {
+        [$user] = self::context(true);
+        self::csrf();
+
+        $result = Automations::sweep();
+
+        Controller::flash(
+            $result['failed'] > 0 ? 'error' : 'success',
+            $result['enrolled'] . ' ' . ($result['enrolled'] === 1 ? 'lead' : 'leads') . ' enrolled'
+            . ($result['failed'] > 0 ? ', ' . $result['failed'] . ' failed' : '')
+            . ($result['enrolled'] === 0 && $result['failed'] === 0 ? ' — everyone matching is already in' : '')
+            . '.'
+        );
+
+        Controller::redirect(self::link('/ghl/automations', $user));
     }
 
     public static function enroll(): void

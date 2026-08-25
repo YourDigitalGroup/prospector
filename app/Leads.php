@@ -118,6 +118,44 @@ final class Leads
         return mb_substr($value, 0, $length);
     }
 
+    /**
+     * Leads keyed by their GoHighLevel contact id.
+     *
+     * Lets a screen full of GoHighLevel records link back to the leads they came
+     * from in one query rather than one per row.
+     *
+     * @param list<string> $contactIds
+     * @return array<string, array<string, mixed>>
+     */
+    public static function byGhlContactIds(array $contactIds): array
+    {
+        $contactIds = array_values(array_filter($contactIds, static fn (string $id): bool => $id !== ''));
+
+        if ($contactIds === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [];
+        foreach ($contactIds as $index => $id) {
+            $placeholders[] = ':c' . $index;
+            $params['c' . $index] = $id;
+        }
+
+        $rows = Database::all(
+            'SELECT id, company, user_id, ghl_contact_id, status FROM leads
+             WHERE ghl_contact_id IN (' . implode(',', $placeholders) . ')',
+            $params
+        );
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(string) $row['ghl_contact_id']] = $row;
+        }
+
+        return $out;
+    }
+
     /** @return array<string, mixed>|null */
     public static function find(int $id): ?array
     {
@@ -351,6 +389,14 @@ final class Leads
             $body .= ' — ' . $note;
         }
         self::addActivity($leadId, $actorId, 'status', $body);
+
+        // A disposition is the most useful automation trigger there is —
+        // "booked a meeting" should be able to start a sequence on its own.
+        // Re-read so the rule sees the status that was just written.
+        $updated = self::find($leadId);
+        if ($updated !== null) {
+            Automations::apply('status', $updated, $actorId);
+        }
 
         return true;
     }
