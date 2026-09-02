@@ -1,52 +1,43 @@
-# Hellforge
+# Fonts
 
-The wordmark next to the pickaxe is set in **Hellforge** — a bold industrial
-slab serif from the Lost Type Co-op: <https://www.losttype.com/font/?name=hellforge>
+## Hellforge — the wordmark
 
-**The font is not in this repository, and cannot be.** Hellforge is
-pay-what-you-want for personal use and licensed from $20 for commercial use
-(1–5 users), and Lost Type does not advertise a webfont licence. Committing the
-files here would be redistributing a licensed font, so the CSS is wired up to
-find them and the files are left to whoever holds the licence.
+`Hellforge.otf` is the face the PROSPECTOR wordmark is set in: an industrial
+slab from the Lost Type Co-op, <https://www.losttype.com/font/?name=hellforge>.
+Committed by the repository owner, who holds the licence.
 
-## To turn it on
+Two things about the file are worth knowing before touching anything that uses
+it.
 
-1. Buy the commercial licence at the link above and confirm it covers web
-   embedding. If the download is desktop-only (`.otf` / `.ttf`), ask Lost Type
-   for the webfont kit rather than converting it yourself — conversion is
-   usually outside a desktop licence.
-2. Drop the files in this directory, named exactly:
+**It is caps only.** 30 glyphs: the 26 uppercase letters and nothing else — no
+lowercase, no digits, no punctuation. That is exactly what a wordmark needs and
+nothing more. The `@font-face` block declares `unicode-range: U+0041-005A` to
+say so out loud, which means the browser only ever reaches for this face for
+A–Z; anything else comes from the next font in the stack rather than turning
+into blank boxes.
 
-   ```
-   assets/fonts/hellforge.woff2
-   assets/fonts/hellforge.woff     (optional, only for very old browsers)
-   ```
+So **do not use this stack for anything but the wordmark.** The strapline under
+it reads "44i lead generation" and would silently lose both of its 4s.
 
-3. That is all. The `@font-face` block in `assets/css/app.css` already points
-   here, and the wordmark picks it up on the next page load.
+**It is OpenType, not WOFF2.** That is a perfectly good webfont format. A WOFF2
+would be roughly a third smaller, but the file is 6KB, so the saving is not
+worth a format conversion that the licence may not cover. If Lost Type ever
+supply a WOFF2, add it ahead of the OTF in the `src` list — browsers take the
+first format they understand.
 
-## Why it cannot simply be downloaded here
+### One caveat on it living here
 
-Two reasons, and the second is the hard one:
+This repository is **public**, so the font is readable by anyone with the URL.
+That is the owner's call to make and it has been made; it is noted here only so
+nobody is surprised by it later. Making the repository private would remove the
+question entirely.
 
-1. There is no direct file to fetch — the download sits behind a
-   name-your-price checkout.
-2. **This repository is public.** A licence for 1–5 users does not cover
-   republishing the font to everyone with the URL, which is what committing it
-   here would do.
+## Alfa Slab One — the fallback
 
-Buying it and dropping it in is entirely fine — that is a licensed copy sitting
-in a working tree, not a redistribution. It is only this repository being public
-that makes committing it a problem. If the repo were made private, committing it
-would be a question for the licence terms rather than an obvious no.
+`alfa-slab-one.woff2` sits behind Hellforge in the stack, for anywhere the OTF
+cannot be served. It is a heavy display slab under the SIL Open Font License,
+which explicitly permits redistribution, so it is safe to ship here. Licence
+text in `alfa-slab-one-OFL.txt`.
 
-## Until then
-
-`alfa-slab-one.woff2` stands in. It is a heavy display slab under the SIL Open
-Font License — which explicitly permits redistribution — so it can live here,
-and it is self-hosted rather than pulled from Google, so nothing is fetched from
-a third party at runtime. Its licence is in `alfa-slab-one-OFL.txt`.
-
-It is not Hellforge, but it is the same species of face: a heavy industrial slab
-that holds the wordmark's shape. Drop Hellforge in and it takes over
-immediately, because it sits ahead of Alfa Slab One in the stack.
+Self-hosted rather than pulled from Google Fonts, so nothing is fetched from a
+third party at runtime — the same property the rest of the app has.

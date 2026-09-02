@@ -1,23 +1,27 @@
 /* ---- the wordmark faces ---------------------------------------------------
-   The PROSPECTOR wordmark wants Hellforge, an industrial slab from the Lost
-   Type Co-op. Hellforge is NOT in this repository and cannot be: it is sold
-   ($20+ commercial, no advertised webfont licence) and this repository is
-   public, so committing it would republish a licensed font to everyone.
-   assets/fonts/README.md says how to drop in a licensed copy — one file, and
-   the wordmark switches to it on the next page load.
+   Hellforge, the industrial slab the PROSPECTOR wordmark is set in, supplied as
+   OpenType. OTF is a perfectly good webfont format — .woff2 would be roughly a
+   third smaller, but at 6KB the saving is not worth a format conversion that
+   the licence may not cover.
 
-   Alfa Slab One stands in until then. It is a heavy display slab under the SIL
-   Open Font License, so it CAN be shipped here, and it is self-hosted rather
-   than pulled from Google so nothing is fetched from a third party at runtime.
-   Licence in assets/fonts/alfa-slab-one-OFL.txt. */
+   The file is CAPS ONLY: 26 uppercase letters, no lowercase, no digits. That is
+   all the wordmark needs, and unicode-range says so out loud — the browser will
+   only ever reach for this face for A-Z, so if it is ever applied to text with
+   digits or lowercase in it, those characters come from the fallback instead of
+   turning into blank boxes. It is also why nothing but the wordmark uses this
+   stack: "44i lead generation" underneath it would lose both of its 4s.
+
+   Alfa Slab One stays as the fallback for anywhere Hellforge cannot be served
+   — it is a heavy display slab under the SIL Open Font License, self-hosted, so
+   nothing is fetched from a third party at runtime. Licence beside it in
+   assets/fonts/alfa-slab-one-OFL.txt. */
 @font-face {
     font-family: 'Hellforge';
-    src: local('Hellforge'),
-         url('../fonts/hellforge.woff2') format('woff2'),
-         url('../fonts/hellforge.woff') format('woff');
-    font-weight: 400 900;
+    src: url('../fonts/Hellforge.otf') format('opentype');
+    font-weight: 400;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0041-005A;
 }
 
 @font-face {
