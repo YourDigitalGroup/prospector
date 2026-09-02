@@ -222,16 +222,6 @@ final class LeadImport
             return;
         }
 
-        // Duplicates inside one file are dropped here rather than at storage,
-        // so the preview count matches what actually lands.
-        $key = Leads::companyKey($company);
-        if (isset($seenKeys[$key])) {
-            $problems[] = 'Row ' . $where . ': "' . $company . '" repeats row ' . $seenKeys[$key] . ' in this file.';
-
-            return;
-        }
-        $seenKeys[$key] = $where;
-
         $row = ['company' => $company];
 
         foreach (array_keys(self::ALIASES) as $field) {
@@ -264,6 +254,24 @@ final class LeadImport
         if (isset($row['website'])) {
             $row['website'] = self::normaliseUrl($row['website']);
         }
+
+        // Duplicates inside one file are dropped here rather than at storage,
+        // so the preview count matches what actually lands.
+        //
+        // Keyed on the company AND the person, the same way storage decides —
+        // several people at one organisation is a normal list, and rejecting
+        // the second one was the bug this fixes. Deliberately after the email
+        // has been validated, so the key is built from what will really be
+        // stored rather than from an address that is about to be dropped.
+        $key = Leads::companyKey($company) . '|' . Leads::contactKey($row);
+        if (isset($seenKeys[$key])) {
+            $who = trim((string) ($row['email'] ?? $row['decision_maker'] ?? ''));
+            $problems[] = 'Row ' . $where . ': ' . ($who !== '' ? '"' . $who . '" at ' : '')
+                . '"' . $company . '" repeats row ' . $seenKeys[$key] . ' in this file.';
+
+            return;
+        }
+        $seenKeys[$key] = $where;
 
         $rows[] = $row;
     }

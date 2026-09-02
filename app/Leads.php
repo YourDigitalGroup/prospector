@@ -45,7 +45,35 @@ final class Leads
     }
 
     /**
-     * Insert a lead unless this owner already has the same company on file.
+     * Identify the person a lead is about, for de-duplication.
+     *
+     * One organisation can be worth several leads — the marketing director and
+     * the GM are different conversations — so a duplicate is the same *person*
+     * at the same company, not merely the same company.
+     *
+     * The email wins when there is one, because two spellings of a name are
+     * common and two spellings of an address are not. With no email the name
+     * carries it, and with neither the key is empty, which stands for "the
+     * company itself, nobody named" — a real thing to have exactly one of.
+     *
+     * @param array<string, mixed> $lead
+     */
+    public static function contactKey(array $lead): string
+    {
+        $email = strtolower(trim((string) ($lead['email'] ?? '')));
+        if ($email !== '') {
+            return mb_substr($email, 0, 190);
+        }
+
+        $person = strtolower(trim((string) ($lead['decision_maker'] ?? '')));
+        $person = trim(preg_replace('/[^a-z0-9 ]+/', ' ', $person) ?? $person);
+        $person = trim(preg_replace('/\s+/', ' ', $person) ?? $person);
+
+        return mb_substr($person, 0, 190);
+    }
+
+    /**
+     * Insert a lead unless this owner already has that person at that company.
      *
      * @param array<string, mixed> $lead
      * @return int 0 when skipped as a duplicate
@@ -58,10 +86,11 @@ final class Leads
         }
 
         $key = self::companyKey($company);
+        $contact = self::contactKey($lead);
 
         $existing = Database::scalar(
-            'SELECT id FROM leads WHERE user_id = :uid AND company_key = :key',
-            ['uid' => $userId, 'key' => $key]
+            'SELECT id FROM leads WHERE user_id = :uid AND company_key = :key AND contact_key = :contact',
+            ['uid' => $userId, 'key' => $key, 'contact' => $contact]
         );
         if ($existing !== null) {
             return 0;
@@ -75,6 +104,7 @@ final class Leads
             'run_id' => $runId,
             'company' => mb_substr($company, 0, 190),
             'company_key' => mb_substr($key, 0, 190),
+            'contact_key' => $contact,
             'website' => self::clean($lead['website'] ?? null, 255),
             'vertical' => self::clean($lead['vertical'] ?? null, 80),
             'door' => self::clean($lead['door'] ?? null, 80),

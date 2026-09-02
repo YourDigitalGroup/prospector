@@ -103,6 +103,24 @@ The tables are created on the next request either way.
 
 ---
 
+## Branding
+
+The accent is **#c8ff00**, a fluorescent lime, at full chroma on the dark theme
+where it can actually glow. On light it steps down to `#a8d900` — `#c8ff00` on
+white is barely visible, and the glow reads as a smudge rather than as light, so
+`--accent-glow` is transparent there and every glow rule goes inert on its own.
+
+The wordmark beside the pickaxe is set in **Hellforge**, an industrial slab serif
+from the Lost Type Co-op. **The font is not in this repository and cannot be** —
+it is licensed ($20+ for commercial use) with no advertised webfont licence, so
+committing it would be redistributing it. The CSS is wired to find it; see
+`assets/fonts/README.md` for the two files to drop in. Until then it falls back
+to a heavy slab stack (Rockwell, which ships with Office on Windows and macOS,
+then Roboto Slab, then Georgia), so it reads as an industrial wordmark rather
+than as the UI font. Nothing is fetched from a third party either way.
+
+---
+
 ## Signing in
 
 | Account | How | Sees |
