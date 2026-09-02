@@ -1,3 +1,22 @@
+/* ---- the wordmark face ----------------------------------------------------
+   Hellforge, the industrial slab the PROSPECTOR wordmark is set in. The files
+   are deliberately NOT in this repository — it is a licensed font from the Lost
+   Type Co-op and shipping it here would be redistributing it. See
+   assets/fonts/README.md for how to switch it on.
+
+   Until the files exist this block does nothing at all: with no local() source
+   to match, the browser tries the URLs, gets a 404, and falls through to the
+   next family in the stack. No third party is contacted either way. */
+@font-face {
+    font-family: 'Hellforge';
+    src: local('Hellforge'),
+         url('../fonts/hellforge.woff2') format('woff2'),
+         url('../fonts/hellforge.woff') format('woff');
+    font-weight: 400 900;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* Prospector — application styles
    Dark by default with a light theme available; both are explicit so the
    toggle wins over the OS preference. */
@@ -12,9 +31,13 @@
     --text: #e9ebef;
     --text-dim: #b3b9c4;
     --muted: #8b929e;
-    --accent: #cdf565;
-    --accent-hover: #d8f97f;
-    --accent-ink: #14180b;
+    /* Fluorescent lime. Full chroma on dark, where it can actually glow;
+       --accent-glow is the colour bled behind accent surfaces to give it that
+       lit-from-within look without washing out the text sitting on top. */
+    --accent: #c8ff00;
+    --accent-hover: #d8ff4d;
+    --accent-ink: #10160a;
+    --accent-glow: color-mix(in srgb, #c8ff00 38%, transparent);
     --link: #9fd0ff;
     --danger: #ff6b6b;
     --danger-bg: #2c1618;
@@ -45,9 +68,13 @@
     --text: #14171c;
     --text-dim: #3d444f;
     --muted: #6b7280;
-    --accent: #b6e63f;
-    --accent-hover: #c4ef56;
-    --accent-ink: #1a2005;
+    /* Nudged down on light: #c8ff00 on white is barely visible, and a glow on a
+       white ground reads as a smudge rather than as light. Same hue, enough
+       depth to sit on paper. */
+    --accent: #a8d900;
+    --accent-hover: #b8ec1a;
+    --accent-ink: #131a00;
+    --accent-glow: transparent;
     --link: #1f6feb;
     --danger: #d5362f;
     --danger-bg: #fdeceb;
@@ -74,9 +101,10 @@
         --text: #14171c;
         --text-dim: #3d444f;
         --muted: #6b7280;
-        --accent: #b6e63f;
-        --accent-hover: #c4ef56;
-        --accent-ink: #1a2005;
+        --accent: #a8d900;
+        --accent-hover: #b8ec1a;
+        --accent-ink: #131a00;
+        --accent-glow: transparent;
         --link: #1f6feb;
         --danger: #d5362f;
         --danger-bg: #fdeceb;
@@ -152,19 +180,28 @@ code {
     border-bottom: 1px solid var(--border);
 }
 
+/* The wordmark. Uppercase and letterspaced because that is how an industrial
+   slab wants to be set, and because it holds its shape when Hellforge is not
+   installed and the fallback slab stands in. */
 .brand-name {
-    font-size: 16px;
-    font-weight: 650;
-    letter-spacing: -.015em;
+    font-family: 'Hellforge', 'Rockwell', 'Rockwell Nova', 'Roboto Slab',
+                 'Bookman Old Style', Georgia, serif;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: .055em;
+    text-transform: uppercase;
     color: var(--text);
 }
 
 .brand-sub {
     display: block;
-    font-size: 11px;
+    margin-top: 3px;
+    font-size: 10.5px;
     font-weight: 500;
     color: var(--muted);
-    letter-spacing: .02em;
+    letter-spacing: .06em;
+    text-transform: uppercase;
 }
 
 .nav { padding: 12px 10px; flex: 1; }
@@ -479,8 +516,20 @@ table.data td.shrink { width: 1%; }
 .btn:hover { background: var(--surface-3); text-decoration: none; }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 
-.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+/* The glow is what separates "fluorescent" from "green". It sits outside the
+   button rather than on the text, so nothing that has to be read gets softer —
+   and it is a no-op on light, where --accent-glow is transparent. */
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    box-shadow: 0 0 0 1px var(--accent-glow), 0 2px 14px -4px var(--accent-glow);
+}
+.btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    box-shadow: 0 0 0 1px var(--accent-glow), 0 3px 20px -3px var(--accent-glow);
+}
 
 .btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
 .btn-danger:hover { background: var(--danger-bg); }
@@ -676,7 +725,17 @@ fieldset { border: 0; margin: 0; padding: 0; }
     margin-bottom: 6px;
 }
 
-.auth-brand span { font-size: 24px; font-weight: 680; color: var(--text); letter-spacing: -.02em; }
+/* Same wordmark, bigger, on the sign-in screen. */
+.auth-brand span {
+    font-family: 'Hellforge', 'Rockwell', 'Rockwell Nova', 'Roboto Slab',
+                 'Bookman Old Style', Georgia, serif;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text);
+}
 .auth-tag { text-align: center; color: var(--muted); margin-bottom: 22px; font-size: 13.5px; }
 .auth-card .card-body { padding: 22px; }
 .auth-foot { text-align: center; margin-top: 16px; font-size: 12.5px; color: var(--muted); }
@@ -954,3 +1013,17 @@ input[type="file"] {
 .thread-meta { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 4px; }
 .thread-subject { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
 .thread-body { font-size: 13px; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+
+/* ---- fluorescent accents -------------------------------------------------
+   A handful of places where the accent is the point, given a little bloom so
+   #c8ff00 reads as lit rather than merely bright. Every one of these is inert
+   on the light theme, where --accent-glow is transparent. */
+
+.nav-item.is-active { box-shadow: inset 2px 0 0 var(--accent), inset 12px 0 22px -18px var(--accent-glow); }
+
+.tile.accent { box-shadow: 0 0 26px -14px var(--accent-glow); }
+
+.badge-new { box-shadow: 0 0 12px -6px var(--accent-glow); }
+
+/* The pickaxe mark and the wordmark next to it. */
+.brand-mark { filter: drop-shadow(0 0 7px var(--accent-glow)); }

@@ -33,7 +33,7 @@ $collar = $isFull ? '12.8' : '14.4';
 $butt = $isFull ? '11.6' : '12.8';
 
 ?>
-<svg class="pickaxe" viewBox="0 0 100 100" width="<?= $logoSize ?>" height="<?= $logoSize ?>"
+<svg class="pickaxe brand-mark" viewBox="0 0 100 100" width="<?= $logoSize ?>" height="<?= $logoSize ?>"
      fill="currentColor" aria-hidden="true" focusable="false">
 <?php if ($isFull): ?>
     <path d="M2.5 64 C2.5 36 21 7 50 1 L56 13.5 C30 20.5 11.5 41.5 6 58.5 Z"/>

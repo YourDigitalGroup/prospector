@@ -63,6 +63,7 @@ final class Schema
                 run_id {$fk} NULL,
                 company VARCHAR(190) NOT NULL,
                 company_key VARCHAR(190) NOT NULL,
+                contact_key VARCHAR(190) NOT NULL DEFAULT '',
                 website VARCHAR(255) NULL,
                 vertical VARCHAR(80) NULL,
                 door VARCHAR(80) NULL,
@@ -175,7 +176,11 @@ final class Schema
             'CREATE INDEX IF NOT EXISTS idx_leads_user ON leads (user_id)',
             'CREATE INDEX IF NOT EXISTS idx_leads_status ON leads (status)',
             'CREATE INDEX IF NOT EXISTS idx_leads_created ON leads (created_at)',
-            'CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_dedupe ON leads (user_id, company_key)',
+            // De-duplication is per company AND per person. One organisation can
+            // have several people worth talking to — a marketing director and
+            // the GM — and the old index on (user_id, company_key) alone made
+            // the second one impossible to add.
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_contact ON leads (user_id, company_key, contact_key)',
             'CREATE INDEX IF NOT EXISTS idx_runs_user_date ON runs (user_id, run_date)',
             'CREATE INDEX IF NOT EXISTS idx_activities_lead ON activities (lead_id)',
             // Unique so regenerating a cadence replaces each step in place. Two
@@ -186,6 +191,45 @@ final class Schema
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_enrolments_pair ON enrolments (lead_id, workflow_id)',
             'CREATE INDEX IF NOT EXISTS idx_rules_owner ON automation_rules (user_id, active)',
         ];
+
+        // Columns first: an index cannot span a column that is not there yet, and
+        // on an existing database contact_key is added by addColumns below.
+        self::addColumns([
+            ['leads', 'contact_key', "VARCHAR(190) NOT NULL DEFAULT ''"],
+        ]);
+
+        // Existing rows land with an empty contact_key, which would collide the
+        // moment two of them share a company. Backfill from the email, else the
+        // name, using the same precedence Leads::contactKey applies — expressed
+        // in SQL so it is one statement rather than a row-by-row pass.
+        if (self::needsContactKeyBackfill()) {
+            Database::run(
+                "UPDATE leads SET contact_key = CASE
+                     WHEN email IS NOT NULL AND email <> '' THEN LOWER(TRIM(email))
+                     WHEN decision_maker IS NOT NULL AND decision_maker <> '' THEN LOWER(TRIM(decision_maker))
+                     ELSE ''
+                 END
+                 WHERE contact_key = ''"
+            );
+        }
+
+        // The company-only unique index has to go before its replacement can do
+        // any good — while it exists, a second person at the same company is
+        // still rejected. Dropping an index that was never there is a no-op, so
+        // this is safe to run on every request.
+        try {
+            Database::pdo()->exec('DROP INDEX ' . (Database::driver() === 'mysql'
+                ? 'idx_leads_dedupe ON leads'
+                : 'IF EXISTS idx_leads_dedupe'));
+        } catch (\PDOException $e) {
+            // MySQL has no IF EXISTS for DROP INDEX before 8.0, and after the
+            // first run there is nothing to drop.
+            if (!str_contains($e->getMessage(), 'check that column/key exists')
+                && !str_contains($e->getMessage(), "doesn't exist")
+                && !str_contains($e->getMessage(), 'no such index')) {
+                throw $e;
+            }
+        }
 
         foreach ($indexes as $sql) {
             try {
@@ -219,6 +263,27 @@ final class Schema
      *
      * @param list<array{0: string, 1: string, 2: string}> $columns table, column, definition
      */
+    /**
+     * Is there anything to backfill?
+     *
+     * Checked rather than run unconditionally because install() runs on every
+     * single request, and an UPDATE over the whole leads table on each one would
+     * be a real cost for no gain. Once every row has a key this is a cheap
+     * indexed-ish read that finds nothing.
+     */
+    private static function needsContactKeyBackfill(): bool
+    {
+        $row = Database::first(
+            "SELECT id FROM leads
+             WHERE contact_key = ''
+               AND ((email IS NOT NULL AND email <> '')
+                    OR (decision_maker IS NOT NULL AND decision_maker <> ''))
+             LIMIT 1"
+        );
+
+        return $row !== null;
+    }
+
     private static function addColumns(array $columns): void
     {
         foreach ($columns as [$table, $column, $definition]) {

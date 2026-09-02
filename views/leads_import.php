@@ -134,7 +134,11 @@ $show = array_values(array_filter($preferred, static function (string $field) us
                 <li><strong>Email addresses without a stated confidence are treated as unverified</strong>
                     (<code>pattern</code>), which keeps them out of the GoHighLevel email field until
                     someone confirms them.</li>
-                <li><strong>Companies already on file for that owner are skipped</strong>, so re-uploading
+                <li><strong>Several people at one organisation is fine.</strong> A duplicate means the
+                    same person at the same company, matched on the email address when there is one
+                    and on the name when there is not — so a marketing director and a GM at the same
+                    hospital are two leads, not a rejected row.</li>
+                <li><strong>People already on file for that owner are skipped</strong>, so re-uploading
                     the same list is safe.</li>
             </ul>
         </div>
