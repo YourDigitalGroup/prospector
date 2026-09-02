@@ -1,20 +1,21 @@
 <?php
 
 /**
- * The Prospector mark: two crossed pickaxes under a swept arch, with a mountain
- * between them. Drawn with currentColor so it takes the surrounding text colour
- * in both themes.
+ * The Prospector mark: a single pickaxe struck through a jagged mountain range,
+ * over a swept valley floor.
  *
- * Two variants, because the mountain needs room. Below about 40px its peaks
- * collapse into one blob welded to the arch, so at small sizes the compact
- * variant is used — the same crossed pickaxes, slightly heavier, no mountain.
- * That is the usual way a logo ships its favicon, and the silhouette stays
- * recognisably the same. assets/img/prospector-mark.svg is the full mark as a
- * standalone file, for decks and anywhere it can be shown large.
+ * Hand-drawn from the supplied artwork rather than traced from it — the file
+ * itself never reached this machine. It is a close rendition, not a pixel copy.
+ * If the original vector turns up, replace the paths below with it and delete
+ * this paragraph; nothing else has to change, because everything around this
+ * only cares about the viewBox and that it paints with currentColor.
  *
- * Note the handles stop at y=95.5, not 99: with an 8.4 stroke and a butt cap the
- * paint extends past the path end, and at 99 the bottom of the mark was being
- * clipped by the viewBox.
+ * Two variants, because detail needs room. Below about 44px the lightning
+ * notches in the slopes silt up into a smudge and the thin blade tip
+ * disappears, so small sizes get the compact variant: the same silhouette with
+ * the notches dropped and the blade a little heavier. That is the usual way a
+ * logo ships its favicon, and the shape stays recognisably the same.
+ * assets/img/prospector-mark.svg is the full mark standalone, for decks.
  *
  * @var int|string|null $size     pixel size; defaults to 26
  * @var string|null     $variant  'auto' (default), 'compact', or 'full'
@@ -28,27 +29,56 @@ if (!in_array($logoVariant, ['compact', 'full'], true)) {
 }
 
 $isFull = $logoVariant === 'full';
-$handle = $isFull ? '8.4' : '10';
-$collar = $isFull ? '12.8' : '14.4';
-$butt = $isFull ? '11.6' : '12.8';
 
 ?>
 <svg class="pickaxe brand-mark" viewBox="0 0 100 100" width="<?= $logoSize ?>" height="<?= $logoSize ?>"
      fill="currentColor" aria-hidden="true" focusable="false">
-<?php if ($isFull): ?>
-    <path d="M2.5 64 C2.5 36 21 7 50 1 L56 13.5 C30 20.5 11.5 41.5 6 58.5 Z"/>
-    <path d="M97.5 64 C97.5 36 79 7 50 1 L44 13.5 C70 20.5 88.5 41.5 94 58.5 Z"/>
-    <path d="M40 30 L45 19.5 L47.3 22.6 L50 15.5 L54.4 24.2 L56.8 21 L60 30 Z"/>
-<?php else: ?>
-    <path d="M2.5 63 C2.5 35 21 7 50 1 L56 15.5 C29.5 22 11 41 5.5 57.5 Z"/>
-    <path d="M97.5 63 C97.5 35 79 7 50 1 L44 15.5 C70.5 22 89 41 94.5 57.5 Z"/>
-<?php endif; ?>
-    <g stroke="currentColor" stroke-linecap="butt" fill="none">
-        <path d="M26 16 L78 95.5" stroke-width="<?= $handle ?>"/>
-        <path d="M74 16 L22 95.5" stroke-width="<?= $handle ?>"/>
-        <path d="M27.7 18.7 L32.5 26.3" stroke-width="<?= $collar ?>"/>
-        <path d="M72.3 18.7 L67.5 26.3" stroke-width="<?= $collar ?>"/>
-        <path d="M74.3 90 L77.5 94.8" stroke-width="<?= $butt ?>"/>
-        <path d="M25.7 90 L22.5 94.8" stroke-width="<?= $butt ?>"/>
-    </g>
+    <?php /* The blade. One long crescent: a point at the left tip, thickening
+             over the top, and tapering to a second point down at the right. */ ?>
+    <path d="M15.4 16.6
+             C31.2 8.8 51.4 10.2 65.0 19.4
+             C75.4 26.8 81.4 37.0 83.0 47.6
+             L74.6 43.2
+             C72.0 36.2 66.4 28.4 57.8 23.2
+             C45.4 16.2 29.0 16.0 18.8 21.2 Z"/>
+
+    <?php /* The head — the chunky angled block the handle is driven into. */ ?>
+    <path d="M54.0 11.6 L65.2 16.0 L61.2 26.4 L50.0 22.0 Z"/>
+
+    <?php /* The handle, running down-left and tucking behind the near peak. */ ?>
+    <path d="M56.8 21.8 L62.6 24.2 L38.4 62.0 L32.8 57.6 Z"/>
+
+    <?php if ($isFull): ?>
+        <?php /* The far peak: tall, apex left of centre, with a lightning
+                 notch bitten out of the long right slope. */ ?>
+        <path d="M62.6 36.4
+                 L95.8 84.8
+                 L84.0 79.2
+                 L79.2 69.6
+                 L75.8 74.8
+                 L68.4 58.0
+                 L56.4 79.2
+                 L44.6 79.2 Z"/>
+
+        <?php /* The near peak. Asymmetric on purpose: a long shallow slope
+                 falling away to the left and a short steep one on the right,
+                 which is what stops the two peaks reading as a matched pair. */ ?>
+        <path d="M33.2 50.6
+                 L46.8 82.8
+                 L34.0 82.8
+                 L24.2 74.0
+                 L21.4 78.4
+                 L17.2 72.6
+                 L13.2 80.6
+                 L7.4 85.0 Z"/>
+    <?php else: ?>
+        <?php /* Compact: the notches drop out, or they silt up at 26px. */ ?>
+        <path d="M62.6 36.4 L95.8 84.8 L56.4 79.2 L44.6 79.2 Z"/>
+        <path d="M33.2 50.6 L46.8 82.8 L34.0 82.8 L7.4 85.0 Z"/>
+    <?php endif; ?>
+
+    <?php /* The valley floor: a shallow crescent, thin at both ends. */ ?>
+    <path d="M3.6 90.8
+             C29.6 79.6 70.4 79.6 96.4 90.8
+             C70.8 83.4 29.2 83.4 3.6 90.8 Z"/>
 </svg>

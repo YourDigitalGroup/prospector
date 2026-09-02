@@ -1,18 +1,29 @@
-/* ---- the wordmark face ----------------------------------------------------
-   Hellforge, the industrial slab the PROSPECTOR wordmark is set in. The files
-   are deliberately NOT in this repository — it is a licensed font from the Lost
-   Type Co-op and shipping it here would be redistributing it. See
-   assets/fonts/README.md for how to switch it on.
+/* ---- the wordmark faces ---------------------------------------------------
+   The PROSPECTOR wordmark wants Hellforge, an industrial slab from the Lost
+   Type Co-op. Hellforge is NOT in this repository and cannot be: it is sold
+   ($20+ commercial, no advertised webfont licence) and this repository is
+   public, so committing it would republish a licensed font to everyone.
+   assets/fonts/README.md says how to drop in a licensed copy — one file, and
+   the wordmark switches to it on the next page load.
 
-   Until the files exist this block does nothing at all: with no local() source
-   to match, the browser tries the URLs, gets a 404, and falls through to the
-   next family in the stack. No third party is contacted either way. */
+   Alfa Slab One stands in until then. It is a heavy display slab under the SIL
+   Open Font License, so it CAN be shipped here, and it is self-hosted rather
+   than pulled from Google so nothing is fetched from a third party at runtime.
+   Licence in assets/fonts/alfa-slab-one-OFL.txt. */
 @font-face {
     font-family: 'Hellforge';
     src: local('Hellforge'),
          url('../fonts/hellforge.woff2') format('woff2'),
          url('../fonts/hellforge.woff') format('woff');
     font-weight: 400 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Alfa Slab One';
+    src: url('../fonts/alfa-slab-one.woff2') format('woff2');
+    font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
@@ -184,8 +195,7 @@ code {
    slab wants to be set, and because it holds its shape when Hellforge is not
    installed and the fallback slab stands in. */
 .brand-name {
-    font-family: 'Hellforge', 'Rockwell', 'Rockwell Nova', 'Roboto Slab',
-                 'Bookman Old Style', Georgia, serif;
+    font-family: 'Hellforge', 'Alfa Slab One', 'Rockwell', 'Roboto Slab', Georgia, serif;
     font-size: 19px;
     font-weight: 700;
     line-height: 1;
@@ -727,8 +737,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
 
 /* Same wordmark, bigger, on the sign-in screen. */
 .auth-brand span {
-    font-family: 'Hellforge', 'Rockwell', 'Rockwell Nova', 'Roboto Slab',
-                 'Bookman Old Style', Georgia, serif;
+    font-family: 'Hellforge', 'Alfa Slab One', 'Rockwell', 'Roboto Slab', Georgia, serif;
     font-size: 30px;
     font-weight: 700;
     line-height: 1;

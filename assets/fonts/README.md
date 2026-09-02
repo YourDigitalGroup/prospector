@@ -25,12 +25,28 @@ find them and the files are left to whoever holds the licence.
 3. That is all. The `@font-face` block in `assets/css/app.css` already points
    here, and the wordmark picks it up on the next page load.
 
+## Why it cannot simply be downloaded here
+
+Two reasons, and the second is the hard one:
+
+1. There is no direct file to fetch — the download sits behind a
+   name-your-price checkout.
+2. **This repository is public.** A licence for 1–5 users does not cover
+   republishing the font to everyone with the URL, which is what committing it
+   here would do.
+
+Buying it and dropping it in is entirely fine — that is a licensed copy sitting
+in a working tree, not a redistribution. It is only this repository being public
+that makes committing it a problem. If the repo were made private, committing it
+would be a question for the licence terms rather than an obvious no.
+
 ## Until then
 
-The wordmark falls back to a heavy slab stack — Rockwell, which ships with
-Microsoft Office on Windows and macOS, then Roboto Slab, then Georgia. It reads
-as an industrial slab wordmark rather than as the default UI font, so nothing
-looks broken while the licence is being sorted; it is simply not Hellforge.
+`alfa-slab-one.woff2` stands in. It is a heavy display slab under the SIL Open
+Font License — which explicitly permits redistribution — so it can live here,
+and it is self-hosted rather than pulled from Google, so nothing is fetched from
+a third party at runtime. Its licence is in `alfa-slab-one-OFL.txt`.
 
-Nothing is fetched from a third party at runtime. If the files are absent the
-browser skips straight to the fallback — no request, no delay, no console error.
+It is not Hellforge, but it is the same species of face: a heavy industrial slab
+that holds the wordmark's shape. Drop Hellforge in and it takes over
+immediately, because it sits ahead of Alfa Slab One in the stack.
