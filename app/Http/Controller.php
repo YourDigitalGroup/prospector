@@ -10,6 +10,7 @@ use Prospector\Claude;
 use Prospector\Emails;
 use Prospector\Enrich;
 use Prospector\GoHighLevel;
+use Prospector\LeadForm;
 use Prospector\LeadImport;
 use Prospector\Leads;
 use Prospector\LocalModel;
@@ -638,6 +639,112 @@ final class Controller
      * to stop a research engine padding a batch to hit a number; a person
      * uploading a file has already made that judgement.
      */
+    /**
+     * Add one lead by hand.
+     *
+     * The third door into the leads table, next to the daily batch and the
+     * uploader, and the one for a lead that came out of a conversation — met
+     * at a conference, passed on by a client, phoned in. LeadForm holds the
+     * field list and the rules; this only decides whose it is, where it hangs,
+     * and where you go next.
+     */
+    public static function leadsNew(): void
+    {
+        self::requireLogin();
+
+        $owners = Auth::isAdmin() ? Users::all() : [];
+
+        $render = static function (array $values, array $errors, int $targetUserId) use ($owners): void {
+            View::page('leads_new', [
+                'title' => 'New lead',
+                'owners' => $owners,
+                'groups' => LeadForm::groups(),
+                'values' => $values,
+                'errors' => $errors,
+                'targetUserId' => $targetUserId,
+            ]);
+        };
+
+        if (!Request::isPost()) {
+            // importTarget reads user_id from the query too, so "save and add
+            // another" comes back still pointed at the same person's account.
+            $render(LeadForm::blank(), [], (int) self::importTarget()['id']);
+
+            return;
+        }
+
+        self::requireCsrf();
+
+        $owner = self::importTarget();
+        $ownerId = (int) $owner['id'];
+        $values = LeadForm::read(static fn (string $field): string => Request::raw($field));
+        $checked = LeadForm::validate($values);
+
+        if ($checked['errors'] !== []) {
+            $render($values, $checked['errors'], $ownerId);
+
+            return;
+        }
+
+        // Say which record it collides with rather than just refusing. Two
+        // people at one company are fine; the same person twice is not, and
+        // when it happens the useful thing is a way to get to the first one.
+        $clash = Leads::findDuplicate($ownerId, $checked['lead']);
+
+        if ($clash !== null) {
+            $who = trim((string) ($clash['decision_maker'] ?? ''));
+            $render(
+                $values,
+                ['company' => ($who !== '' ? $who : 'Somebody with no name')
+                    . ' at ' . (string) $clash['company'] . ' is already on file for '
+                    . (string) $owner['name'] . ' — lead #' . (int) $clash['id'] . '.'],
+                $ownerId
+            );
+
+            return;
+        }
+
+        $loop = (string) $owner['loop'];
+        if (!Users::isRunnableLoop($loop)) {
+            $loop = 'partner';
+        }
+
+        $runId = Runs::handEntered($ownerId, $loop, Clock::today());
+        $id = Leads::create($ownerId, $runId, $checked['lead']);
+
+        if ($id === 0) {
+            self::flash('error', 'That lead could not be saved. Nothing was stored.');
+            $render($values, [], $ownerId);
+
+            return;
+        }
+
+        Runs::recount($runId);
+        Leads::addActivity($id, Auth::id(), 'created', 'Added by hand by ' . (string) (Auth::user()['name'] ?? 'someone'));
+
+        // Deliberately after the lead exists: setStatus writes its own activity
+        // entry and fires the disposition automations, which is exactly what
+        // should happen when someone records a lead they have already spoken to.
+        if ($checked['status'] !== 'new') {
+            Leads::setStatus($id, $checked['status'], null, Auth::id());
+        }
+
+        $label = trim((string) ($checked['lead']['decision_maker'] ?? '')) !== ''
+            ? (string) $checked['lead']['decision_maker'] . ' at ' . (string) $checked['lead']['company']
+            : (string) $checked['lead']['company'];
+
+        // Entering a stack of cards after an event is the normal case, so
+        // "save and add another" comes back to an empty form rather than
+        // making someone navigate back for each one.
+        if (Request::raw('and_another') !== '') {
+            self::flash('success', 'Saved ' . $label . '. Next one.');
+            self::redirect('/leads/new' . ($ownerId !== Auth::id() ? '?user_id=' . $ownerId : ''));
+        }
+
+        self::flash('success', 'Added ' . $label . '.');
+        self::redirect('/leads/' . $id);
+    }
+
     public static function leadsImport(): void
     {
         self::requireLogin();

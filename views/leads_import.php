@@ -40,6 +40,10 @@ $show = array_values(array_filter($preferred, static function (string $field) us
         <div class="sub">Add a list by hand — CSV, or JSON from a batch run elsewhere</div>
     </div>
     <div class="page-head-actions">
+        <a class="btn btn-ghost" href="<?= View::e(View::url('leads/new')) ?>">
+            <?php $name = 'plus'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+            Add one by hand
+        </a>
         <a class="btn btn-ghost" href="<?= View::e(View::url('leads')) ?>">
             <?php $name = 'arrow-left'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
             Back to leads

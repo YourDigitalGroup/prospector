@@ -58,8 +58,12 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
         </div>
     </div>
     <div class="page-head-actions">
-        <a class="btn" href="<?= View::e(View::url('leads/import')) ?>">
+        <a class="btn btn-primary" href="<?= View::e(View::url('leads/new')) ?>">
             <?php $name = 'plus'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+            New lead
+        </a>
+        <a class="btn" href="<?= View::e(View::url('leads/import')) ?>">
+            <?php $name = 'list'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
             Upload leads
         </a>
         <a class="btn" href="<?= View::e(View::url('leads/export', $query)) ?>">
@@ -196,13 +200,14 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                     Loosen a filter, or clear them all to see everything delivered so far.
                 <?php else: ?>
                     Nothing has been delivered yet. Batches run automatically each weekday morning, or you
-                    can start one now from the Batches screen.
+                    can start one now from the Batches screen — or add someone you have already spoken to.
                 <?php endif; ?>
             </p>
             <?php if ($hasFilters): ?>
                 <a class="btn" href="<?= View::e(View::url('leads')) ?>">Clear filters</a>
             <?php else: ?>
-                <a class="btn btn-primary" href="<?= View::e(View::url('runs')) ?>">Go to batches</a>
+                <a class="btn btn-primary" href="<?= View::e(View::url('leads/new')) ?>">Add a lead by hand</a>
+                <a class="btn" href="<?= View::e(View::url('runs')) ?>">Go to batches</a>
             <?php endif; ?>
         </div>
     <?php else: ?>
