@@ -1,21 +1,27 @@
 <?php
 
 /**
- * The Prospector mark: a single pickaxe struck through a jagged mountain range,
- * over a swept valley floor.
+ * The Prospector mark.
  *
- * Hand-drawn from the supplied artwork rather than traced from it — the file
- * itself never reached this machine. It is a close rendition, not a pixel copy.
- * If the original vector turns up, replace the paths below with it and delete
- * this paragraph; nothing else has to change, because everything around this
- * only cares about the viewBox and that it paints with currentColor.
+ * Prefers the supplied artwork. Drop the real logo in as one of:
  *
- * Two variants, because detail needs room. Below about 44px the lightning
- * notches in the slopes silt up into a smudge and the thin blade tip
+ *     assets/img/logo.svg      (best — scales, and can inherit currentColor)
+ *     assets/img/logo.png      (fine — used at its own colours)
+ *
+ * and it is used everywhere the mark appears, with no code change. Nothing
+ * else in the app cares which one is in play.
+ *
+ * Failing that it falls back to the drawing below, which was made by eye from a
+ * picture of the artwork rather than traced from the file — the image rendered
+ * in conversation but its bytes never reached this machine. It is a rendition,
+ * not a copy, and it is meant to be replaced.
+ *
+ * Two variants of the fallback, because detail needs room. Below about 44px the
+ * lightning notches in the slopes silt up into a smudge and the thin blade tip
  * disappears, so small sizes get the compact variant: the same silhouette with
- * the notches dropped and the blade a little heavier. That is the usual way a
- * logo ships its favicon, and the shape stays recognisably the same.
- * assets/img/prospector-mark.svg is the full mark standalone, for decks.
+ * the notches dropped. A supplied SVG is used at every size as-is; a supplied
+ * PNG likewise, so make sure it is big enough to survive the 26px sidebar mark
+ * being a downscale rather than an upscale.
  *
  * @var int|string|null $size     pixel size; defaults to 26
  * @var string|null     $variant  'auto' (default), 'compact', or 'full'
@@ -30,8 +36,45 @@ if (!in_array($logoVariant, ['compact', 'full'], true)) {
 
 $isFull = $logoVariant === 'full';
 
-?>
-<svg class="pickaxe brand-mark" viewBox="0 0 100 100" width="<?= $logoSize ?>" height="<?= $logoSize ?>"
+// SVG first: it scales cleanly and, if it is drawn with currentColor, still
+// takes the surrounding colour. A PNG is used as-is.
+$logoDir = dirname(__DIR__, 2) . '/assets/img/';
+$suppliedSvg = is_file($logoDir . 'logo.svg') ? $logoDir . 'logo.svg' : null;
+$suppliedPng = is_file($logoDir . 'logo.png') ? $logoDir . 'logo.png' : null;
+
+if ($suppliedSvg !== null) {
+    $markup = (string) file_get_contents($suppliedSvg);
+
+    // Strip anything that cannot legally sit inside a document body, then force
+    // the size so one file serves the 26px sidebar and the 72px sign-in screen.
+    $markup = preg_replace('/<\?xml.*?\?>/is', '', $markup) ?? $markup;
+    $markup = preg_replace('/<!DOCTYPE.*?>/is', '', $markup) ?? $markup;
+    $markup = preg_replace('/\s(width|height)="[^"]*"/i', '', $markup, 2) ?? $markup;
+    $markup = preg_replace(
+        '/<svg\b/i',
+        '<svg class="pickaxe brand-mark" width="' . $logoSize . '" height="' . $logoSize
+            . '" aria-hidden="true" focusable="false"',
+        trim($markup),
+        1
+    ) ?? $markup;
+
+    echo $markup;
+
+    return;
+}
+
+if ($suppliedPng !== null) {
+    printf(
+        '<img class="pickaxe brand-mark" src="%s" width="%d" height="%d" alt="" aria-hidden="true">',
+        \Prospector\Support\View::e(\Prospector\Support\View::url('assets/img/logo.png')),
+        $logoSize,
+        $logoSize
+    );
+
+    return;
+}
+
+?><svg class="pickaxe brand-mark" viewBox="0 0 100 100" width="<?= $logoSize ?>" height="<?= $logoSize ?>"
      fill="currentColor" aria-hidden="true" focusable="false">
     <?php /* The blade. One long crescent: a point at the left tip, thickening
              over the top, and tapering to a second point down at the right. */ ?>

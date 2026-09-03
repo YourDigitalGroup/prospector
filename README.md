@@ -110,6 +110,12 @@ where it can actually glow. On light it steps down to `#a8d900` — `#c8ff00` on
 white is barely visible, and the glow reads as a smudge rather than as light, so
 `--accent-glow` is transparent there and every glow rule goes inert on its own.
 
+The mark itself comes from `assets/img/logo.svg` if that file exists, or
+`assets/img/logo.png` if it does not — drop the real artwork in as either and it
+is used everywhere, with no code change. With neither present it falls back to a
+drawing in `views/partials/logo.php` that was made by eye from a picture of the
+artwork, which is a rendition rather than a copy and is meant to be replaced.
+
 The wordmark beside the pickaxe is set in **Hellforge**, an industrial slab from
 the Lost Type Co-op, self-hosted from `assets/fonts/`. The file is **caps only** —
 26 uppercase letters and nothing else — so the `@font-face` declares a
