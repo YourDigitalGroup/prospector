@@ -569,8 +569,12 @@ table.data td.shrink { width: 1%; }
 
 label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin-bottom: 5px; }
 
+/* Every text-shaped input, listed by type rather than caught with :not() so a
+   checkbox or a file picker is never dragged in by accident. tel is here
+   because the new-lead form has two phone boxes and they were the only styled
+   fields on the site rendering as browser defaults. */
 input[type="text"], input[type="email"], input[type="password"], input[type="number"],
-input[type="search"], input[type="url"], select, textarea {
+input[type="search"], input[type="url"], input[type="tel"], select, textarea {
     width: 100%;
     padding: 8px 11px;
     font-family: inherit;
@@ -594,6 +598,33 @@ input:focus, select:focus, textarea:focus {
 .field { margin-bottom: 14px; }
 .field-row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+/* A roomier version of .field-row, for a screen that is nothing but form.
+   auto-FILL rather than auto-fit on purpose: with auto-fit the empty tracks
+   collapse, so a group holding one field stretches it the full width of the
+   card, and a lone status dropdown a thousand pixels wide looks like a mistake.
+   align-items: start stops a field with a two-line hint from stretching its
+   neighbours to match. */
+.field-grid {
+    display: grid;
+    gap: 12px 14px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    align-items: start;
+}
+
+/* A field that wants the whole row rather than a share of it — the prose
+   boxes, mostly, which are unreadable in a narrow column. */
+.field-wide { grid-column: 1 / -1; }
+
+/* A validation message, in place of the hint it replaces. Coloured and marked
+   so it does not depend on colour alone to be noticed. */
+.hint-error { color: var(--danger); }
+.hint-error::before { content: '! '; font-weight: 700; }
+.field:has(.hint-error) input,
+.field:has(.hint-error) select,
+.field:has(.hint-error) textarea { border-color: var(--danger); }
+
+.form-actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
 
 .check { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
 .check input { width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--accent); flex: 0 0 auto; }

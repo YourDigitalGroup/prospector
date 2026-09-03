@@ -73,6 +73,34 @@ final class Leads
     }
 
     /**
+     * The lead this one would collide with, if there is one.
+     *
+     * create() answers "did it go in" with a 0, which is all a bulk import
+     * needs. A person typing a lead in wants the other half of that sentence:
+     * which record they are looking at and how to get to it.
+     *
+     * @param array<string, mixed> $lead
+     * @return array<string, mixed>|null
+     */
+    public static function findDuplicate(int $userId, array $lead): ?array
+    {
+        $company = trim((string) ($lead['company'] ?? ''));
+
+        if ($company === '') {
+            return null;
+        }
+
+        return Database::first(
+            'SELECT * FROM leads WHERE user_id = :uid AND company_key = :key AND contact_key = :contact',
+            [
+                'uid' => $userId,
+                'key' => self::companyKey($company),
+                'contact' => self::contactKey($lead),
+            ]
+        );
+    }
+
+    /**
      * Insert a lead unless this owner already has that person at that company.
      *
      * @param array<string, mixed> $lead

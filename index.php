@@ -69,6 +69,7 @@ try {
 
         $path === '/leads' => Controller::leads(),
         $path === '/leads/export' => Controller::leadsExport(),
+        $path === '/leads/new' => Controller::leadsNew(),
         $path === '/leads/import' => Controller::leadsImport(),
         // Named with real extensions so the browser and Excel both know what
         // they just downloaded.

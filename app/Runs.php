@@ -177,6 +177,60 @@ final class Runs
         ]);
     }
 
+    /**
+     * The run that hand-entered leads hang off — one per owner per day, made
+     * on demand and reused for the rest of that day.
+     *
+     * A lead typed in by hand did not come from a batch, so run_id could
+     * honestly be null. It is not, because too much of the app counts through
+     * runs: "leads today" on the dashboard and the fortnight sparkline both ask
+     * which run a lead belongs to and what date that run carries. A null there
+     * means eight leads entered after a conference show up as a flat zero for
+     * the day, which is worse than slightly stretching what a run is. One row a
+     * day also keeps /runs readable — a stack of business cards becomes a
+     * single "Added by hand" entry rather than eight.
+     */
+    public static function handEntered(int $userId, string $loop, string $date): int
+    {
+        $existing = Database::scalar(
+            "SELECT id FROM runs
+             WHERE user_id = :uid AND run_date = :d AND trigger_source = 'manual'
+             ORDER BY id DESC LIMIT 1",
+            ['uid' => $userId, 'd' => $date]
+        );
+
+        if ($existing !== null) {
+            return (int) $existing;
+        }
+
+        $runId = self::start($userId, $loop, $date, 'manual', 'Added by hand', '', 'none');
+
+        Database::update('runs', [
+            'status' => 'success',
+            'brief_md' => "## Added by hand\n\nLeads typed in directly rather than found by a batch.\n",
+            'finished_at' => Clock::now(),
+        ], ['id' => $runId]);
+
+        return $runId;
+    }
+
+    /**
+     * Recount a run from the leads that actually point at it.
+     *
+     * Derived rather than incremented, so it stays right when a lead is later
+     * deleted — the hand-entry run is added to all day and there is no single
+     * moment at which it is finished.
+     */
+    public static function recount(int $runId): void
+    {
+        Database::update('runs', [
+            'lead_count' => (int) Database::scalar(
+                'SELECT COUNT(*) FROM leads WHERE run_id = :rid',
+                ['rid' => $runId]
+            ),
+        ], ['id' => $runId]);
+    }
+
     /** @param array<string, mixed> $data */
     public static function finish(int $runId, array $data): void
     {

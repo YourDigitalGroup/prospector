@@ -110,11 +110,18 @@ where it can actually glow. On light it steps down to `#a8d900` — `#c8ff00` on
 white is barely visible, and the glow reads as a smudge rather than as light, so
 `--accent-glow` is transparent there and every glow rule goes inert on its own.
 
-The mark itself comes from `assets/img/logo.svg` if that file exists, or
-`assets/img/logo.png` if it does not — drop the real artwork in as either and it
-is used everywhere, with no code change. With neither present it falls back to a
-drawing in `views/partials/logo.php` that was made by eye from a picture of the
-artwork, which is a rendition rather than a copy and is meant to be replaced.
+The mark is the artwork at `assets/img/logo.png`. To change it, overwrite that
+file — or drop in an `assets/img/logo.svg`, which wins over the PNG and scales
+cleanly at every size. Either way there is no code to change. Then run
+`php bin/favicons.php` and commit the two PNGs it writes, so the tab and
+home-screen icons follow the logo instead of drifting behind it. With neither
+file present the mark falls back to a drawing in `views/partials/logo.php` that
+was made by eye from a picture of the artwork — a rendition, not a copy, and
+only there so a missing asset degrades to something rather than to nothing.
+
+Because the PNG is a fixed colour it cannot track `--accent` the way the rest of
+the interface does, so `--mark-filter` gives it the bloom on dark and the same
+step down in depth on light.
 
 The wordmark beside the pickaxe is set in **Hellforge**, an industrial slab from
 the Lost Type Co-op, self-hosted from `assets/fonts/`. The file is **caps only** —
@@ -189,6 +196,27 @@ Steps 1, 4 and 5 are the same whichever engine is running. With the external wor
 happen on your machine and the finished rows arrive over `/api/import`, where the score floor and
 the de-duplication are applied again — a buggy or over-eager worker cannot lower the bar. That
 worker never emits a `pattern` address at all, because it never infers one.
+
+### Adding one lead by hand
+
+**Leads → New lead** is for somebody you have actually spoken to — met at a conference, passed on
+by a client, phoned in. Every field the uploader accepts is on the form, plus a status, so a lead
+you have already had a conversation with can go straight in as *Contacted* or *Meeting booked*
+rather than as *New*. Setting it there fires the same automations a disposition would.
+
+Two things differ from an upload, both because a person is sitting there typing:
+
+- **Nothing is silently dropped.** A file with a bad email address keeps the row and loses the
+  address; the form points at the field and hands your typing back. A collision reports which
+  record it clashed with and its number, rather than counting itself as skipped.
+- **An email defaults to verified**, the opposite of the upload default below. Everywhere else an
+  address with no stated provenance is a guess, because a model or a scraper supplied it. One typed
+  in here came out of a conversation. It is still a dropdown, so an address you worked out rather
+  than were given can say so and stay out of bulk sends.
+
+Everything entered on a given day hangs off one "Added by hand" batch for that owner, so a stack
+of business cards shows up as a single entry on **Daily batches** and still counts towards the
+day's total on the dashboard. **Save and add another** comes straight back to an empty form.
 
 ### Uploading a list by hand
 
@@ -454,6 +482,8 @@ app/
   Api.php              /api/assignment and /api/import, for the external worker
   GoHighLevel.php      GoHighLevel API v2 client
   Leads.php            lead storage, filtering, dispositions, de-duplication
+  LeadImport.php       parse a pasted or uploaded CSV/JSON list
+  LeadForm.php         the fields and rules for a lead typed in by hand
   Outreach.php         the cadence spec and the copywriting call
   LocalModel.php       the OpenAI-compatible client for a local model server
   Automations.php      enrolment rules, the sweep, and who is in what
@@ -464,9 +494,10 @@ app/
   loops/               the loop specifications, one Markdown file per loop
   Support/             database, schema, settings, crypto, clock, views, markdown
 views/                 screens, partials, and the email template
-assets/                stylesheet, script, pickaxe mark
+assets/                stylesheet, script, the logo, the Hellforge wordmark face
 bin/daily.php          CLI runner for cron
 bin/serve.php          local dev server router
+bin/favicons.php       rebuild the tab icons from assets/img/logo.png
 worker/                the external worker — runs on your Mac, talks to local Ollama
 storage/               database, encryption key, logs (never served, never committed)
 ```
