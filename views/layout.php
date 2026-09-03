@@ -73,7 +73,7 @@ $active = static function (string $path) use ($currentPath): bool {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= View::e(($title ?? 'Home') . ' · ' . $appName) ?></title>
-    <link rel="icon" href="<?= View::e(View::url('assets/img/pickaxe.svg')) ?>" type="image/svg+xml">
+    <?php require __DIR__ . '/partials/favicon.php'; ?>
     <link rel="stylesheet" href="<?= View::e(View::asset('assets/css/app.css')) ?>">
     <meta name="robots" content="noindex, nofollow">
     <script>
