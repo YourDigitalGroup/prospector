@@ -53,6 +53,10 @@
     --accent-hover: #d8ff4d;
     --accent-ink: #10160a;
     --accent-glow: color-mix(in srgb, #c8ff00 38%, transparent);
+    /* The mark is a fixed-colour image, so it cannot follow --accent the way
+       everything else does. On dark it is already the right lime and only wants
+       the same bloom the other accent surfaces get. */
+    --mark-filter: drop-shadow(0 0 7px var(--accent-glow));
     --link: #9fd0ff;
     --danger: #ff6b6b;
     --danger-bg: #2c1618;
@@ -90,6 +94,11 @@
     --accent-hover: #b8ec1a;
     --accent-ink: #131a00;
     --accent-glow: transparent;
+    /* Same nudge as --accent, applied to the artwork instead of to a hex: full
+       lime on white is a smudge. Saturate first so pulling the brightness down
+       deepens the colour rather than greying it. Lands on roughly #acd202,
+       which is --accent to the eye. */
+    --mark-filter: saturate(1.18) brightness(.84);
     --link: #1f6feb;
     --danger: #d5362f;
     --danger-bg: #fdeceb;
@@ -120,6 +129,7 @@
         --accent-hover: #b8ec1a;
         --accent-ink: #131a00;
         --accent-glow: transparent;
+        --mark-filter: saturate(1.18) brightness(.84);
         --link: #1f6feb;
         --danger: #d5362f;
         --danger-bg: #fdeceb;
@@ -1038,5 +1048,6 @@ input[type="file"] {
 
 .badge-new { box-shadow: 0 0 12px -6px var(--accent-glow); }
 
-/* The pickaxe mark and the wordmark next to it. */
-.brand-mark { filter: drop-shadow(0 0 7px var(--accent-glow)); }
+/* The pickaxe mark and the wordmark next to it. See --mark-filter: on dark it
+   is a bloom, on light it is the same depth adjustment --accent gets. */
+.brand-mark { filter: var(--mark-filter); }

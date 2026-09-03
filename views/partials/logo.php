@@ -3,18 +3,21 @@
 /**
  * The Prospector mark.
  *
- * Prefers the supplied artwork. Drop the real logo in as one of:
+ * The real artwork is in place at assets/img/logo.png and is what you see
+ * everywhere the mark appears. To replace it, overwrite that file — or drop in
+ * an assets/img/logo.svg, which wins over the PNG, scales, and if drawn with
+ * currentColor will follow the surrounding colour. Either way there is no code
+ * to change; nothing else in the app cares which one is in play. Rerun
+ * bin/favicons.php afterwards so the tab icon follows.
  *
- *     assets/img/logo.svg      (best — scales, and can inherit currentColor)
- *     assets/img/logo.png      (fine — used at its own colours)
+ * Because the PNG is a fixed colour it cannot track --accent the way the rest
+ * of the interface does, so the light theme leans on the --mark-filter variable
+ * in app.css to give it the same depth --accent gets on a white ground.
  *
- * and it is used everywhere the mark appears, with no code change. Nothing
- * else in the app cares which one is in play.
- *
- * Failing that it falls back to the drawing below, which was made by eye from a
- * picture of the artwork rather than traced from the file — the image rendered
- * in conversation but its bytes never reached this machine. It is a rendition,
- * not a copy, and it is meant to be replaced.
+ * Failing both files it falls back to the drawing below, which was made by eye
+ * from a picture of the artwork rather than traced from the file. It is a
+ * rendition, not a copy, and it exists only so a missing asset degrades to
+ * something rather than to nothing.
  *
  * Two variants of the fallback, because detail needs room. Below about 44px the
  * lightning notches in the slopes silt up into a smudge and the thin blade tip
