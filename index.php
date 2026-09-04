@@ -81,6 +81,8 @@ try {
         $path === '/leads/sample.csv' => Controller::leadsSample('csv'),
         $path === '/leads/sample.json' => Controller::leadsSample('json'),
         $path === '/leads/bulk' && $method === 'POST' => Controller::leadsBulk(),
+        $path === '/leads/email' && $method === 'POST' => Controller::leadsEmail(),
+        $path === '/attachments' && $method === 'POST' => Controller::attachmentUpload(),
 
         $path === '/runs' => Controller::runs(),
         $path === '/runs/start' && $method === 'POST' => Controller::runStart(),

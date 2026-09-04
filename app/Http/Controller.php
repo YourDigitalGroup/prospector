@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Prospector\Http;
 
 use Prospector\Auth;
+use Prospector\Attachment;
 use Prospector\Automations;
 use Prospector\Claude;
 use Prospector\Direct;
@@ -142,6 +143,12 @@ final class Controller
             // hid actions that would have worked perfectly well.
             'ghlReady' => GoHighLevel::forUser(self::scopedOwner()) !== null,
             'workflows' => self::workflowsForBulk(),
+            // The bulk composer shows the sender's own signature. Scoped to the
+            // owner being looked at, so an admin filtered to Darren previews
+            // Darren's sign-off rather than their own.
+            'bulkSignatureHtml' => \Prospector\Signature::html(
+                \Prospector\Signature::forUser(self::scopedOwner())
+            ),
         ]);
     }
 
@@ -522,9 +529,162 @@ final class Controller
             'to' => Request::input('to'),
             'subject' => Request::input('subject'),
             'body' => Request::raw('body'),
+            'attachments' => self::attachmentPaths(),
         ], Auth::id());
 
         self::flash($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
+    /**
+     * Send one written message to every lead that was ticked.
+     *
+     * Backgrounded, because forty sends are forty round trips to GoHighLevel
+     * and the request would time out somewhere in the twenties, leaving nobody
+     * able to say which of them went. The response is handed back first and the
+     * work carries on behind it, exactly as a cadence build does.
+     */
+    public static function leadsEmail(): void
+    {
+        self::requireLogin();
+        self::requireCsrf();
+
+        $back = Request::input('return', '/leads');
+        $ids = Request::ints('ids');
+
+        if ($ids === []) {
+            self::flash('error', 'Nothing was sent — no leads were selected.');
+            self::redirect($back);
+        }
+
+        $leads = [];
+        foreach ($ids as $id) {
+            $lead = Leads::find($id);
+            if ($lead !== null && Auth::canAccessUser((int) $lead['user_id'])) {
+                $leads[] = $lead;
+            }
+        }
+
+        $triage = Direct::triage($leads);
+
+        if ($triage['ready'] === []) {
+            self::flash('error', $triage['blocked'] === []
+                ? 'Nothing was sent — none of those leads could be reached.'
+                : 'Nothing was sent. ' . self::describeBlocked($triage['blocked']));
+            self::redirect($back);
+        }
+
+        $message = [
+            'channel' => 'Email',
+            'subject' => Request::raw('subject'),
+            'body' => Request::raw('body'),
+            'attachments' => self::attachmentPaths(),
+        ];
+
+        $actorId = Auth::id();
+        $ready = $triage['ready'];
+        $count = count($ready);
+
+        $note = $count . ' ' . ($count === 1 ? 'email is' : 'emails are') . ' going out now.';
+        if ($triage['blocked'] !== []) {
+            $note .= ' ' . self::describeBlocked($triage['blocked']);
+        }
+        $note .= ' Each one lands on its own lead as it sends.';
+
+        self::flash('success', $note);
+
+        $target = View::url(ltrim($back, '/'));
+
+        if (!Background::canDetach()) {
+            // No FastCGI to hand the response to. Do it inline and hope the
+            // host is patient; still redirects, so a refresh cannot re-send.
+            Background::extendLimits(1800);
+            Direct::sendMany($ready, $message, $actorId);
+            self::redirect($back);
+        }
+
+        Background::respondThenContinue('', 303, ['Location' => $target]);
+
+        // The session lock has to go before a long run, or every other request
+        // from this browser queues behind it.
+        session_write_close();
+
+        Direct::sendMany($ready, $message, $actorId);
+        exit;
+    }
+
+    /**
+     * @param array<string, int> $blocked
+     */
+    private static function describeBlocked(array $blocked): string
+    {
+        $parts = [];
+
+        foreach ($blocked as $reason => $count) {
+            $parts[] = $count . ' skipped — ' . lcfirst(rtrim($reason, '.'));
+        }
+
+        return implode('; ', $parts) . '.';
+    }
+
+    /**
+     * Attachment paths from the compose form, kept only if the file is really
+     * there. The form posts paths rather than files, because the files were
+     * uploaded while the message was being written.
+     *
+     * @return list<string>
+     */
+    private static function attachmentPaths(): array
+    {
+        $posted = $_POST['attachments'] ?? [];
+
+        if (!is_array($posted)) {
+            return [];
+        }
+
+        $paths = [];
+
+        foreach ($posted as $path) {
+            if (is_string($path) && Attachment::exists($path)) {
+                $paths[] = $path;
+            }
+        }
+
+        return array_slice($paths, 0, Attachment::MAX_FILES);
+    }
+
+    /**
+     * Take one attachment and answer with where it went.
+     *
+     * Its own endpoint because the file is uploaded while the message is still
+     * being written: posting the whole compose form to add a file would throw
+     * away the draft, and a 10MB upload riding along with every send attempt is
+     * a slow way to discover a typo in the subject line.
+     */
+    public static function attachmentUpload(): void
+    {
+        self::requireLogin();
+        self::requireCsrf();
+
+        $file = $_FILES['file'] ?? null;
+
+        if (!is_array($file)) {
+            self::json(['ok' => false, 'message' => 'No file arrived.'], 400);
+        }
+
+        $stored = Attachment::store($file);
+
+        self::json($stored, $stored['ok'] ? 200 : 422);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private static function json(array $payload, int $status = 200): never
+    {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        echo json_encode($payload);
+        exit;
     }
 
     public static function leadsBulk(): void

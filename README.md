@@ -500,6 +500,61 @@ as inferred, and sending to it does not make it verified.
 
 A lead with no address and no phone gets an explanation rather than a box.
 
+### Emailing several at once
+
+Tick leads on the list and press **Send an email**. One message is written and
+one message is sent *per person* — each recipient sees only their own address,
+and merge variables resolve against their own record. GoHighLevel's conversation
+model is per contact anyway, so there is no bulk endpoint to use even if that
+were wanted.
+
+Leads that cannot be reached are named rather than counted silently: the flash
+says "3 emails are going out now. 1 skipped — no email address on file." A bulk
+send that reports success while eight bounced off a missing address is worse
+than one that says what happened.
+
+The send is backgrounded. Forty sends are forty round trips, and the request
+would time out somewhere in the twenties leaving nobody able to say which of
+them went.
+
+### Merge variables
+
+`{{contact.first_name}}`, `{{contact.company_name}}`, `{{user.phone}}` and the
+rest — the names are GoHighLevel's, so copy moves between the two without
+editing. A picker in the composer inserts them at the cursor.
+
+**They are resolved here, not there.** Passing an unresolved
+`{{contact.first_name}}` to `/conversations/messages` and hoping GoHighLevel
+fills it in is a bet on undocumented behaviour, and the way that bet loses is a
+real prospect receiving "Hi {{contact.first_name}}".
+
+Two deliberate behaviours. A variable with nothing behind it **falls back**
+rather than blanking — no first name on file gives "there", so a greeting never
+arrives as "Hi ,". A variable **nobody defined stays visible**, so a typo shows
+up in the preview instead of silently deleting itself. Leads carry one
+`decision_maker` field because that is how they arrive, so the first name is
+split out of it — and trailing credentials are dropped, which is why "Cale
+Slack, DDS" greets as "Cale".
+
+### Formatting and attachments
+
+Bold, italic, underline, size, bullets and links, in a contenteditable box.
+What comes back is **rebuilt against an allow-list** in `Support\RichText`
+rather than searched for bad things: stripping `<script>` and `onclick=` is a
+game you lose eventually, because the list of dangerous constructs is
+open-ended, and keeping only named tags and attributes is closed-ended. The
+plain-text part is derived from the cleaned HTML so the two cannot drift apart.
+
+Attachments are uploaded as they are picked, not with the message, so a 10MB
+file does not ride along with every failed send. GoHighLevel takes them as URLs,
+so they are hosted here and linked. The extension allow-list is the whole
+security model — a PDF cannot be re-encoded the way a signature image can — and
+two exclusions are worth naming: **SVG is refused**, because it is an image
+everywhere except in a browser, where it is a document that can carry script
+running on our own origin; and **HTML is refused** for the same reason. Files
+land under a random directory rather than a random name, so the recipient saves
+"proposal.pdf" rather than "9f2c…e1.pdf".
+
 ### Signatures
 
 Each person sets their own under **GoHighLevel → Connection**: name, title, company, phone, email,
@@ -539,6 +594,22 @@ said to this person". Anything sent from the lead screen or from a cadence appea
 
 The Inbox filters by channel and by unread, and links each conversation back to the lead it belongs
 to instead of being a dead end.
+
+### The bulk bar
+
+Marking a lead is a choice between seven things, so it stays a dropdown. Everything else — send an
+email, push to GoHighLevel, add to an automation, archive, unarchive, delete — is one thing you
+either want or do not, and each has its own button. Burying "push to GoHighLevel" as the eighth
+option of a select made a one-click job take three.
+
+Delete, push and send carry their own colours (`#ff003c`, `#e400ff`, `#00ff9c`), given explicitly
+rather than derived from `--accent` so they are the same in both themes: a destructive button that
+changes colour with the theme is one somebody eventually fails to recognise.
+
+Deleting asks first, in a dialog of the app's own rather than `window.confirm` — which cannot be
+styled, reads as a browser malfunction on a phone, and is easy to dismiss by reflex. It names how
+many are about to go and points at Archive as the reversible alternative. Nothing else confirms:
+marking six leads "contacted" being a two-step job is how people learn to click through warnings.
 
 ---
 
@@ -621,7 +692,9 @@ app/
   LeadImport.php       parse a pasted or uploaded CSV/JSON list
   LeadForm.php         the fields and rules for a lead typed in by hand
   Outreach.php         the cadence spec and the copywriting call
-  Direct.php           one-off email and SMS to a lead, sent on the spot
+  Direct.php           one-off and bulk email/SMS to leads, sent on the spot
+  Merge.php            {{contact.first_name}} and friends, resolved per lead
+  Attachment.php       uploaded files, and the URLs GoHighLevel fetches them by
   Signature.php        the per-user sign-off, its logo upload and its HTML
   LocalModel.php       the OpenAI-compatible client for a local model server
   Automations.php      enrolment rules, the sweep, and who is in what
@@ -630,7 +703,8 @@ app/
   Users.php  Auth.php  accounts and sign-in
   Mailer.php           the daily brief email
   loops/               the loop specifications, one Markdown file per loop
-  Support/             database, schema, settings, crypto, clock, views, markdown
+  Support/             database, schema, settings, crypto, clock, views, markdown,
+                       and RichText, the allow-list HTML sanitiser
 views/                 screens, partials, and the email template
 assets/                stylesheet, script, the logo, the Hellforge wordmark face
 bin/daily.php          CLI runner for cron

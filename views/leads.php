@@ -15,6 +15,7 @@ use Prospector\Support\View;
  * @var list<array<string, mixed>> $owners
  * @var bool $ghlReady
  * @var list<array<string, mixed>> $workflows
+ * @var string $bulkSignatureHtml
  * @var string $csrf
  */
 
@@ -212,49 +213,91 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <form method="post" action="<?= View::e(View::url('leads/bulk')) ?>" data-bulk-form>
+        <form method="post" action="<?= View::e(View::url('leads/bulk')) ?>" data-bulk-form
+                  data-confirm-dialog="bulk-delete-confirm">
             <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
             <input type="hidden" name="return" value="<?= View::e($returnTo) ?>">
 
+            <?php /* Marking a lead is a choice between seven things, so it stays a
+                     dropdown. Everything else is one thing you either want or do not,
+                     and burying "push to GoHighLevel" as the eighth option of a select
+                     made it a three-click job to do something that should be one. */ ?>
             <div class="bulkbar hidden" data-bulk-bar>
                 <span class="count" data-bulk-count>0 leads selected</span>
-                <select name="bulk_action" aria-label="Bulk action">
-                    <option value="">Choose an action…</option>
-                    <?php foreach (Leads::STATUSES as $key => $label): ?>
-                        <option value="<?= View::e($key) ?>">Mark <?= View::e(strtolower($label)) ?></option>
-                    <?php endforeach; ?>
-                    <?php if ($ghlReady): ?>
-                        <option value="ghl">Push to GoHighLevel</option>
-                    <?php endif; ?>
-                    <?php if ($workflows !== []): ?>
-                        <option value="enrol">Add to an automation…</option>
-                    <?php endif; ?>
-                    <option value="archive">Archive</option>
-                    <option value="restore">Unarchive</option>
-                    <option value="delete">Delete for good…</option>
-                </select>
-                <?php if ($workflows === [] && $isAdmin): ?>
+
+                <span class="bulk-group">
+                    <select name="bulk_action" aria-label="Mark the selected leads as">
+                        <option value="">Choose an action…</option>
+                        <?php foreach (Leads::STATUSES as $key => $label): ?>
+                            <option value="<?= View::e($key) ?>">Mark <?= View::e(strtolower($label)) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="btn btn-sm">Apply</button>
+                </span>
+
+                <?php if ($ghlReady): ?>
+                    <?php /* type=button, not submit: this one opens the composer
+                             rather than posting the bulk form. */ ?>
+                    <button type="button" class="btn btn-sm btn-send" data-open-dialog="bulk-compose">
+                        <?php $name = 'mail'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                        Send an email
+                    </button>
+
+                    <button type="submit" class="btn btn-sm btn-ghl" name="bulk_action" value="ghl"
+                            data-busy="Pushing…">
+                        <?php $name = 'link'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                        Push to GoHighLevel
+                    </button>
+                <?php endif; ?>
+
+                <?php if ($workflows !== []): ?>
+                    <span class="bulk-group">
+                        <select name="workflow_id" aria-label="Which automation" data-enrol-picker
+                                onchange="this.form.workflow_name.value = this.options[this.selectedIndex].text">
+                            <option value="">Add to an automation…</option>
+                            <?php foreach ($workflows as $workflow): ?>
+                                <option value="<?= View::e($workflow['id'] ?? '') ?>">
+                                    <?= View::e($workflow['name'] ?? 'Untitled workflow') ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <input type="hidden" name="workflow_name" value="">
+                        <button type="submit" class="btn btn-sm" name="bulk_action" value="enrol">Add</button>
+                    </span>
+                <?php elseif ($isAdmin): ?>
                     <span class="dim small">
                         Filter to one owner to add leads to their automations —
                         workflows belong to a sub-account.
                     </span>
                 <?php endif; ?>
 
-                <?php if ($workflows !== []): ?>
-                    <select name="workflow_id" aria-label="Which automation" data-enrol-picker
-                            onchange="this.form.workflow_name.value = this.options[this.selectedIndex].text">
-                        <option value="">Which automation…</option>
-                        <?php foreach ($workflows as $workflow): ?>
-                            <option value="<?= View::e($workflow['id'] ?? '') ?>">
-                                <?= View::e($workflow['name'] ?? 'Untitled workflow') ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <input type="hidden" name="workflow_name" value="">
+                <?php if (!empty($filters['archived_only']) || !empty($filters['include_archived'])): ?>
+                    <button type="submit" class="btn btn-sm" name="bulk_action" value="restore">
+                        <?php $name = 'unarchive'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                        Unarchive
+                    </button>
                 <?php endif; ?>
 
-                <button type="submit" class="btn btn-sm btn-primary">Apply to selected</button>
+                <button type="submit" class="btn btn-sm" name="bulk_action" value="archive">
+                    <?php $name = 'archive'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                    Archive
+                </button>
+
+                <button type="submit" class="btn btn-sm btn-delete" name="bulk_action" value="delete">
+                    <?php $name = 'trash'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                    Delete
+                </button>
             </div>
+
+            <?php /* The select-all in the table header is gone on a phone, because
+                     the header row is. Without this there is no way to pick every
+                     lead on the screen at the size where tapping forty checkboxes
+                     is the least appealing. */ ?>
+            <label class="select-all mobile-only">
+                <input type="checkbox" data-check-all class="check-box"
+                       aria-label="Select every lead on this page">
+                Select all <?= count($leads) ?> on this page
+            </label>
 
             <div class="table-scroll">
                 <table class="data compact">
@@ -362,6 +405,73 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                 </table>
             </div>
         </form>
+
+        <?php /* Both dialogs sit outside the bulk form: a <form> inside a <form>
+                 is invalid and the browser silently drops the inner one, which
+                 would post the compose fields to the bulk endpoint. They pick up
+                 the ticked leads through app.js instead. */ ?>
+        <dialog class="sheet" id="bulk-compose">
+            <form method="post" action="<?= View::e(View::url('leads/email')) ?>"
+                  data-busy="Sending…" data-bulk-recipients>
+                <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                <input type="hidden" name="return" value="<?= View::e($returnTo) ?>">
+
+                <div class="sheet-head">
+                    <h2>Email <span data-bulk-recipient-count>the selected leads</span></h2>
+                    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">&times;</button>
+                </div>
+
+                <div class="sheet-body">
+                    <p class="hint">
+                        One email each, not one email to everybody: each person sees only
+                        their own address, and anything you insert below is filled in from
+                        their own record.
+                    </p>
+
+                    <div class="field">
+                        <label for="bulk-subject">Subject</label>
+                        <input type="text" id="bulk-subject" name="subject" maxlength="255"
+                               placeholder="A quick thought for {{contact.company_name}}">
+                    </div>
+
+                    <?php
+                    $id = 'bulk';
+                    $signatureHtml = $bulkSignatureHtml;
+                    $signatureLink = View::url('ghl/connect');
+                    require __DIR__ . '/partials/composer.php';
+                    ?>
+                </div>
+
+                <div class="sheet-foot">
+                    <button type="submit" class="btn btn-send">
+                        <?php $name = 'mail'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+                        Send to <span data-bulk-recipient-count>the selected</span>
+                    </button>
+                    <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+                </div>
+            </form>
+        </dialog>
+
+        <dialog class="sheet sheet-sm" id="bulk-delete-confirm">
+            <div class="sheet-head">
+                <h2>Delete for good?</h2>
+                <button type="button" class="icon-btn" data-confirm-no aria-label="Close">&times;</button>
+            </div>
+            <div class="sheet-body">
+                <p>
+                    <strong data-confirm-count>These leads</strong> and everything on them —
+                    notes, timeline, drafted email — go permanently. This cannot be undone.
+                </p>
+                <p class="hint">
+                    Archive instead if you only want them out of the working list; an archived
+                    lead keeps its history and can be brought back.
+                </p>
+            </div>
+            <div class="sheet-foot">
+                <button type="button" class="btn btn-delete" data-confirm-go>Delete permanently</button>
+                <button type="button" class="btn btn-ghost" data-confirm-no>Keep them</button>
+            </div>
+        </dialog>
 
         <?php if ($pages > 1): ?>
             <div class="pagination">

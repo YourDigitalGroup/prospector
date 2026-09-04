@@ -630,23 +630,11 @@ if (!empty($lead['evidence'])) {
                                    placeholder="<?= View::e($defaultSubject) ?>">
                         </div>
 
-                        <div class="field">
-                            <label for="send-body">Message</label>
-                            <textarea id="send-body" name="body" rows="9" required
-                                      placeholder="Good talking on Tuesday — here is the one-pager I mentioned."></textarea>
-                        </div>
-
-                        <?php if ($signatureHtml !== ''): ?>
-                            <details class="signature-preview">
-                                <summary>Signed off with your signature</summary>
-                                <div class="signature-render"><?= $signatureHtml ?></div>
-                            </details>
-                        <?php else: ?>
-                            <p class="hint">
-                                No signature set, so this goes out unsigned.
-                                <a href="<?= View::e(View::url('ghl/connect', $isAdmin ? ['user_id' => (int) $lead['user_id']] : [])) ?>">Set one up</a>.
-                            </p>
-                        <?php endif; ?>
+                        <?php
+                        $id = 'send';
+                        $signatureLink = View::url('ghl/connect', $isAdmin ? ['user_id' => (int) $lead['user_id']] : []);
+                        require __DIR__ . '/partials/composer.php';
+                        ?>
 
                     </div>
 

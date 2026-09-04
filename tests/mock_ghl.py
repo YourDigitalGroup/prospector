@@ -371,6 +371,7 @@ class Handler(BaseHTTPRequestHandler):
                     "subject": payload.get("subject", ""),
                     "html": payload.get("html", ""),
                     "emailTo": payload.get("emailTo", ""),
+                    "attachments": payload.get("attachments", []),
                     "dateAdded": "2026-08-12T09:00:00Z",
                 })
                 conversation["lastMessageBody"] = payload.get("message", "")
