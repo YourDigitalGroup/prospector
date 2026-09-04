@@ -135,11 +135,19 @@ either way. See `assets/fonts/README.md`.
 
 ## Signing in
 
+Three accounts are created on first boot, and only on first boot — the seed is skipped the moment
+the users table has anything in it, so it can never overwrite a live install:
+
 | Account | How | Sees |
 |---|---|---|
 | `scott@44interactive.com` | email + password | everything, every user's leads, all settings |
 | `billy@44idigital.com` | email only | only their own leads |
 | `darren@44i.com` | email only | only their own leads |
+
+**Sara is not one of them.** The Home Prospector loop ships fully wired — spec, rotation,
+geography, the lot — but with nobody assigned to it, because her address is not something the code
+should be guessing at. She is added on the Users screen like any other person, which is where she
+was added. A fresh install has the same gap and closes it the same way.
 
 Billy and Darren need no password — their email address alone signs them in. That is convenient,
 and it means anyone who knows the address and the site URL can read their leads. Both accounts
