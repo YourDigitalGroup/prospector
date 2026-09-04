@@ -7,6 +7,8 @@ use Prospector\Support\View;
  * @var array{ok: bool, message: string}|null $connection
  * @var bool $hasToken
  * @var string $locationId
+ * @var string $signature
+ * @var string $suggestedSignature
  * @var array<string, mixed> $workspaceUser
  * @var bool $viewingOther
  */
@@ -79,6 +81,39 @@ $scopes = [
                                 onclick="return confirm('Disconnect this sub-account? The token will be deleted.')">
                             Disconnect
                         </button>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <?php /* Its own form, deliberately: editing a sign-off should not mean
+             re-posting a credential, and it can be written before the token
+             exists. */ ?>
+    <div class="card">
+        <div class="card-head"><h2>How your email is signed</h2></div>
+        <div class="card-body">
+            <p class="dim">
+                Put on the end of anything sent from a lead's page. Cadence copy already
+                writes its own sign-off, so this does not touch it.
+            </p>
+
+            <form method="post" action="<?= View::e(View::url('ghl/signature', $wsQuery)) ?>">
+                <input type="hidden" name="csrf" value="<?= View::e(Auth::csrfToken()) ?>">
+
+                <div class="field">
+                    <label for="email_signature">Sign-off</label>
+                    <textarea id="email_signature" name="email_signature" rows="4"
+                              placeholder="<?= View::e($suggestedSignature) ?>"><?= View::e($signature) ?></textarea>
+                    <div class="hint">
+                        Plain text, no formatting. Leave it empty and email goes out unsigned.
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn btn-primary" type="submit">Save sign-off</button>
+                    <?php if ($signature === ''): ?>
+                        <button class="btn" type="submit" name="use_suggested" value="1">Use the suggestion</button>
                     <?php endif; ?>
                 </div>
             </form>

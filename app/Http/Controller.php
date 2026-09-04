@@ -7,6 +7,7 @@ namespace Prospector\Http;
 use Prospector\Auth;
 use Prospector\Automations;
 use Prospector\Claude;
+use Prospector\Direct;
 use Prospector\Emails;
 use Prospector\Enrich;
 use Prospector\GoHighLevel;
@@ -208,13 +209,23 @@ final class Controller
     {
         $id = (int) $lead['id'];
         $digState = Leads::digState($lead);
+        $owner = Users::find((int) $lead['user_id']);
 
         View::page('lead', array_merge([
             'title' => (string) $lead['company'],
             'lead' => $lead,
             'activities' => Leads::activities($id),
             'owners' => Auth::isAdmin() ? Users::all() : [],
-            'ghlReady' => GoHighLevel::forUser(Users::find((int) $lead['user_id'])) !== null,
+            'ghlReady' => GoHighLevel::forUser($owner) !== null,
+            // Everything the compose box needs to explain itself before anyone
+            // types: whether this owner can send at all, whether this lead can
+            // be reached each way, and how it will be signed.
+            'sendAs' => $owner,
+            'canSend' => Direct::available($owner),
+            'canEmail' => Direct::reachable($lead, 'Email'),
+            'canText' => Direct::reachable($lead, 'SMS'),
+            'signature' => Direct::signature($owner),
+            'defaultSubject' => Direct::defaultSubject($lead),
             'run' => $lead['run_id'] !== null ? Runs::find((int) $lead['run_id']) : null,
             'digStatus' => $digState['status'],
             'dig' => $digState['findings'],
@@ -493,46 +504,23 @@ final class Controller
      *
      * @param array<string, mixed> $lead
      */
+    /**
+     * Send one message to a lead, written on the spot.
+     *
+     * The rules all live in Direct — who may send, who can be reached, what
+     * happens when the lead is not in GoHighLevel yet. This reads the form and
+     * reports the answer.
+     *
+     * @param array<string, mixed> $lead
+     */
     private static function replyToLead(array $lead): void
     {
-        $body = trim(Request::raw('body'));
-        $channel = strtoupper(Request::input('channel')) === 'SMS' ? 'SMS' : 'Email';
-
-        if ($body === '') {
-            self::flash('error', 'Write something first.');
-
-            return;
-        }
-
-        $contactId = trim((string) ($lead['ghl_contact_id'] ?? ''));
-        if ($contactId === '') {
-            self::flash('error', 'Push this lead to GoHighLevel before replying.');
-
-            return;
-        }
-
-        $client = GoHighLevel::forUser(Users::find((int) $lead['user_id']));
-        if ($client === null) {
-            self::flash('error', 'GoHighLevel is not connected for this owner.');
-
-            return;
-        }
-
-        $subject = Request::input('subject');
-        if ($channel === 'Email' && $subject === '') {
-            $subject = 'Re: ' . (string) $lead['company'];
-        }
-
-        $result = $client->sendMessage($contactId, $channel, $body, $subject);
-
-        if ($result['ok']) {
-            Leads::addActivity(
-                (int) $lead['id'],
-                Auth::id(),
-                'email',
-                strtolower($channel) . ' reply: ' . mb_strimwidth($body, 0, 120, '…')
-            );
-        }
+        $result = Direct::send($lead, [
+            'channel' => Request::input('channel'),
+            'subject' => Request::input('subject'),
+            'body' => Request::raw('body'),
+            'confirm_unverified' => Request::bool('confirm_unverified'),
+        ], Auth::id());
 
         self::flash($result['ok'] ? 'success' : 'error', $result['message']);
     }

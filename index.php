@@ -100,6 +100,7 @@ try {
         $path === '/ghl/connect' && $method === 'POST' => Workspace::connectSave(),
         $path === '/ghl/connect' => Workspace::connect(),
         $path === '/ghl/disconnect' && $method === 'POST' => Workspace::disconnect(),
+        $path === '/ghl/signature' && $method === 'POST' => Workspace::signature(),
 
         $path === '/ghl/move' && $method === 'POST' => Workspace::move(),
         $path === '/ghl/status' && $method === 'POST' => Workspace::status(),
