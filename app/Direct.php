@@ -87,7 +87,7 @@ final class Direct
      * Send it.
      *
      * @param array<string, mixed> $lead
-     * @param array{subject?: string, body?: string, channel?: string, confirm_unverified?: bool, signature?: bool} $message
+     * @param array{subject?: string, body?: string, channel?: string, to?: string, signature?: bool} $message
      * @return array{ok: bool, message: string}
      */
     public static function send(array $lead, array $message, ?int $actorId = null): array
@@ -132,19 +132,19 @@ final class Direct
             $lead['email_confidence'] = 'verified';
         }
 
-        // A 'pattern' address was inferred from the shape of other addresses at
-        // the domain and never confirmed. Bulk sends refuse it outright; a
-        // deliberate one-off to somebody you picked is a different decision, so
-        // this asks rather than refuses — but it does ask.
-        if ($channel === 'Email'
-            && Outreach::isUnverified($lead)
-            && ($message['confirm_unverified'] ?? false) !== true) {
-            return [
-                'ok' => false,
-                'message' => (string) $lead['email'] . ' has not been confirmed, so it may bounce. '
-                    . 'Tick the box to send anyway.',
-            ];
-        }
+        // Note what is deliberately not here: a confirmation step for an
+        // address marked 'pattern' — inferred from the shape of other addresses
+        // at the domain rather than confirmed.
+        //
+        // Bulk sends still refuse those; that guard lives in Outbox and is the
+        // one that matters, because nobody reads a hundred addresses before
+        // pressing send on all of them. One-off compose is the opposite
+        // situation: somebody opened this lead, opened this dialog, and typed a
+        // message to this person. Asking them to confirm a decision they have
+        // already made three times is the kind of prompt people learn to click
+        // through without reading, which costs the warning its meaning
+        // everywhere else it appears. The lead itself still badges the address
+        // as inferred, which is where that belongs.
 
         /** @var GoHighLevel $client */
         $client = GoHighLevel::forUser($owner);

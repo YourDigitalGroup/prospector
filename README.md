@@ -489,10 +489,16 @@ timeline where their reply will land too.
 one — the same thing a cadence step does. Being sent off to press another button before you can
 answer somebody is not a safeguard.
 
-**A guessed address asks before it sends.** An address marked `pattern` was inferred from the shape
-of other addresses at the domain and never confirmed; bulk sends refuse it outright, and this asks
-instead, because a deliberate one-off to a person you picked is a different decision. A lead with no
-address and no phone gets an explanation rather than a box.
+**A guessed address sends without asking.** An address marked `pattern` was inferred from the
+shape of other addresses at the domain and never confirmed. Bulk sends still refuse those, and that
+is the guard that matters — nobody reads a hundred addresses before pressing send on all of them.
+One-off compose is the opposite situation: somebody opened this lead, opened this dialog, and typed
+a message to this person. There was a confirmation tick here at first, asking them to agree to a
+decision they had already made three times, which is how people learn to click past warnings and
+costs the warning its meaning everywhere else it appears. The lead itself still badges the address
+as inferred, and sending to it does not make it verified.
+
+A lead with no address and no phone gets an explanation rather than a box.
 
 ### Signatures
 

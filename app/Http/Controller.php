@@ -522,7 +522,6 @@ final class Controller
             'to' => Request::input('to'),
             'subject' => Request::input('subject'),
             'body' => Request::raw('body'),
-            'confirm_unverified' => Request::bool('confirm_unverified'),
         ], Auth::id());
 
         self::flash($result['ok'] ? 'success' : 'error', $result['message']);
