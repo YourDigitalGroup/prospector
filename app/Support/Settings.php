@@ -55,7 +55,50 @@ final class Settings
         'local_model_url' => '',
         'local_model_name' => '',
         'local_model_key' => '',
+        // The last host a browser actually used. Email sent by cron has no
+        // request to derive one from, and a signature logo whose src is
+        // http://localhost is a broken image in every inbox that gets it.
+        'public_url' => '',
     ];
+
+    /**
+     * The public base URL, for anything that leaves the building.
+     *
+     * Config first, because a server that knows its own name should say so.
+     * Then the last host a real browser used, remembered by rememberPublicUrl
+     * below. View::baseUrl last, which on CLI is localhost — right for a
+     * developer, wrong for an email, and the reason the other two exist.
+     */
+    public static function publicUrl(): string
+    {
+        $configured = View::baseUrl();
+
+        // A CLI run has no HTTP_HOST, so baseUrl guesses localhost. Prefer what
+        // was remembered from a real request over that guess.
+        if (str_contains($configured, '://localhost')) {
+            $remembered = self::get('public_url');
+            if ($remembered !== '') {
+                return $remembered;
+            }
+        }
+
+        return $configured;
+    }
+
+    /**
+     * Record the host this request came in on, if it is a real one and it has
+     * changed. Called once per web request; a no-op almost every time.
+     */
+    public static function rememberPublicUrl(string $url): void
+    {
+        if ($url === '' || str_contains($url, '://localhost') || str_contains($url, '://127.0.0.1')) {
+            return;
+        }
+
+        if (self::get('public_url') !== $url) {
+            self::set('public_url', $url);
+        }
+    }
 
     /** @var array<string, string>|null */
     private static ?array $cache = null;

@@ -660,6 +660,41 @@ final class Leads
         ];
     }
 
+    /**
+     * Correct the address on a lead, and say so on the timeline.
+     *
+     * Its own method rather than a Database::update at the call site because
+     * the contact_key is derived from the email: change one without the other
+     * and de-duplication starts matching on an address the lead no longer has.
+     */
+    public static function setEmail(int $leadId, string $email, string $confidence, ?int $actorId = null): void
+    {
+        $lead = self::find($leadId);
+
+        if ($lead === null) {
+            return;
+        }
+
+        $was = trim((string) ($lead['email'] ?? ''));
+        $updated = array_merge($lead, ['email' => $email]);
+
+        Database::update('leads', [
+            'email' => mb_substr($email, 0, 190),
+            'email_confidence' => in_array($confidence, ['verified', 'high', 'pattern'], true) ? $confidence : 'verified',
+            'contact_key' => self::contactKey($updated),
+            'updated_at' => Clock::now(),
+        ], ['id' => $leadId]);
+
+        self::addActivity(
+            $leadId,
+            $actorId,
+            'note',
+            $was === ''
+                ? 'Address set to ' . $email
+                : 'Address corrected from ' . $was . ' to ' . $email
+        );
+    }
+
     public static function markSyncedToGhl(int $leadId, string $contactId): void
     {
         Database::update(

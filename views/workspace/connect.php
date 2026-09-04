@@ -7,8 +7,10 @@ use Prospector\Support\View;
  * @var array{ok: bool, message: string}|null $connection
  * @var bool $hasToken
  * @var string $locationId
- * @var string $signature
- * @var string $suggestedSignature
+ * @var array<string, string> $signature
+ * @var array<string, array{label: string, hint?: string, placeholder?: string}> $signatureFields
+ * @var array<string, string> $suggested
+ * @var string $signaturePreview
  * @var array<string, mixed> $workspaceUser
  * @var bool $viewingOther
  */
@@ -89,34 +91,77 @@ $scopes = [
 
     <?php /* Its own form, deliberately: editing a sign-off should not mean
              re-posting a credential, and it can be written before the token
-             exists. */ ?>
+             exists. Structured fields rather than a free-text box, because the
+             logo has to render as HTML and hand-written HTML in outbound mail
+             is a support burden nobody wants. */ ?>
     <div class="card">
-        <div class="card-head"><h2>How your email is signed</h2></div>
+        <div class="card-head">
+            <h2>Your email signature</h2>
+            <span class="dim small">on anything sent from a lead</span>
+        </div>
         <div class="card-body">
             <p class="dim">
-                Put on the end of anything sent from a lead's page. Cadence copy already
-                writes its own sign-off, so this does not touch it.
+                Put on the end of email sent from a lead's page. Cadence copy writes its own
+                sign-off, so this does not touch it, and a text never gets one.
             </p>
 
-            <form method="post" action="<?= View::e(View::url('ghl/signature', $wsQuery)) ?>">
+            <form method="post" enctype="multipart/form-data"
+                  action="<?= View::e(View::url('ghl/signature', $wsQuery)) ?>">
                 <input type="hidden" name="csrf" value="<?= View::e(Auth::csrfToken()) ?>">
 
+                <div class="field-grid">
+                    <?php foreach ($signatureFields as $field => $spec): ?>
+                        <?php $wide = $field === 'tagline'; ?>
+                        <div class="field<?= $wide ? ' field-wide' : '' ?>">
+                            <label for="sig-<?= View::e($field) ?>"><?= View::e($spec['label']) ?></label>
+                            <input type="text" id="sig-<?= View::e($field) ?>" name="<?= View::e($field) ?>"
+                                   value="<?= View::e($signature[$field] ?? '') ?>"
+                                   placeholder="<?= View::e($spec['placeholder'] ?? '') ?>" maxlength="190">
+                            <?php if (isset($spec['hint'])): ?>
+                                <div class="hint"><?= View::e($spec['hint']) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <hr class="divider">
+
                 <div class="field">
-                    <label for="email_signature">Sign-off</label>
-                    <textarea id="email_signature" name="email_signature" rows="4"
-                              placeholder="<?= View::e($suggestedSignature) ?>"><?= View::e($signature) ?></textarea>
+                    <label for="sig-image">Logo or headshot</label>
+                    <?php if (($signature['image'] ?? '') !== ''): ?>
+                        <div class="signature-render mb">
+                            <img src="<?= View::e(\Prospector\Signature::imageUrl($signature['image']) ?? '') ?>"
+                                 alt="Current signature image">
+                        </div>
+                    <?php endif; ?>
+                    <input type="file" id="sig-image" name="image"
+                           accept="image/png,image/jpeg,image/gif,image/webp">
+                    <?php $limits = \Prospector\Signature::limits(); ?>
                     <div class="hint">
-                        Plain text, no formatting. Leave it empty and email goes out unsigned.
+                        PNG, JPEG, GIF or WebP, up to <?= (int) $limits['megabytes'] ?>MB. It is
+                        re-saved as a PNG no bigger than <?= (int) $limits['width'] ?>&times;<?= (int) $limits['height'] ?>
+                        and served from this site, because mail clients refuse embedded images and
+                        will only fetch a real URL.
                     </div>
                 </div>
 
                 <div class="btn-row">
-                    <button class="btn btn-primary" type="submit">Save sign-off</button>
-                    <?php if ($signature === ''): ?>
-                        <button class="btn" type="submit" name="use_suggested" value="1">Use the suggestion</button>
+                    <button class="btn btn-primary" type="submit">Save signature</button>
+                    <?php if (($signature['image'] ?? '') !== ''): ?>
+                        <button class="btn btn-ghost" type="submit" name="remove_image" value="1"
+                                onclick="return confirm('Remove the signature image?')">Remove image</button>
+                    <?php endif; ?>
+                    <?php if (\Prospector\Signature::isEmpty($signature)): ?>
+                        <button class="btn" type="submit" name="use_suggested" value="1">Start from my details</button>
                     <?php endif; ?>
                 </div>
             </form>
+
+            <?php if ($signaturePreview !== ''): ?>
+                <hr class="divider">
+                <label>How it arrives</label>
+                <div class="signature-render"><?= $signaturePreview ?></div>
+            <?php endif; ?>
         </div>
     </div>
 

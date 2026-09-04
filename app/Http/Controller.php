@@ -225,6 +225,8 @@ final class Controller
             'canEmail' => Direct::reachable($lead, 'Email'),
             'canText' => Direct::reachable($lead, 'SMS'),
             'signature' => Direct::signature($owner),
+            'signatureHtml' => \Prospector\Signature::html(Direct::signature($owner)),
+            'fromAddress' => Direct::fromAddress($owner),
             'defaultSubject' => Direct::defaultSubject($lead),
             'run' => $lead['run_id'] !== null ? Runs::find((int) $lead['run_id']) : null,
             'digStatus' => $digState['status'],
@@ -517,6 +519,7 @@ final class Controller
     {
         $result = Direct::send($lead, [
             'channel' => Request::input('channel'),
+            'to' => Request::input('to'),
             'subject' => Request::input('subject'),
             'body' => Request::raw('body'),
             'confirm_unverified' => Request::bool('confirm_unverified'),

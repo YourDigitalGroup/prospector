@@ -262,18 +262,19 @@ foreach ($rows as $row) {
             </div>
 
             <div class="table-scroll">
-                <table class="data">
+                <table class="data compact">
                     <thead>
                         <tr>
                             <th class="shrink">
                                 <input type="checkbox" data-check-all aria-label="Select all leads"
                                        class="check-box">
                             </th>
+                            <th class="cell-compact"></th>
                             <th>Company</th>
                             <th>Sending to</th>
                             <th class="nowrap">Cadence</th>
                             <th class="nowrap">Next</th>
-                            <?php if ($isAdmin): ?><th class="secondary">Owner</th><?php endif; ?>
+                            <?php if ($isAdmin): ?><th>Owner</th><?php endif; ?>
                             <th class="right"></th>
                         </tr>
                     </thead>
@@ -292,6 +293,27 @@ foreach ($rows as $row) {
                                                class="check-box">
                                     <?php endif; ?>
                                 </td>
+                                <?php /* The phone row — see the note in leads.php. Here the
+                                         third fact is where the cadence has got to, since that
+                                         is what this screen is for. */ ?>
+                                <td class="cell-compact">
+                                    <a href="<?= View::e(View::url('outreach/lead', ['id' => $leadId])) ?>">
+                                        <span class="compact-name"><?= View::e($lead['company']) ?></span>
+                                        <?php if (!empty($lead['decision_maker'])): ?>
+                                            <span class="compact-sub"><?= View::e($lead['decision_maker']) ?></span>
+                                        <?php endif; ?>
+                                    </a>
+                                    <span class="badge badge-<?= $c['steps'] === 0 ? 'neutral' : ($c['drafts'] > 0 ? 'new' : 'high') ?>">
+                                        <?php if ($c['steps'] === 0): ?>
+                                            none
+                                        <?php elseif ($c['drafts'] > 0): ?>
+                                            <?= (int) $c['drafts'] ?> to review
+                                        <?php else: ?>
+                                            <?= (int) $c['sent'] ?>/<?= (int) $c['steps'] ?>
+                                        <?php endif; ?>
+                                    </span>
+                                </td>
+
                                 <td>
                                     <div class="cell-primary">
                                         <a href="<?= View::e(View::url('outreach/lead', ['id' => $leadId])) ?>">
@@ -342,7 +364,7 @@ foreach ($rows as $row) {
                                     <?php endif; ?>
                                 </td>
                                 <?php if ($isAdmin): ?>
-                                    <td class="nowrap small dim secondary"><?= View::e($lead['owner_name'] ?? '') ?></td>
+                                    <td class="nowrap small dim"><?= View::e($lead['owner_name'] ?? '') ?></td>
                                 <?php endif; ?>
                                 <td class="right nowrap">
                                     <a class="btn btn-sm" href="<?= View::e(View::url('outreach/lead', ['id' => $leadId])) ?>">

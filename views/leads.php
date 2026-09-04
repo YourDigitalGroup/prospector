@@ -257,7 +257,7 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
             </div>
 
             <div class="table-scroll">
-                <table class="data">
+                <table class="data compact">
                     <thead>
                     <tr>
                         <th class="shrink">
@@ -265,13 +265,14 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                    class="check-box">
                         </th>
                         <th class="shrink">Fit</th>
+                        <th class="cell-compact"></th>
                         <th>Company</th>
                         <th>Contact</th>
-                        <th class="secondary">Market</th>
+                        <th>Market</th>
                         <th>Why them</th>
                         <th>Status</th>
-                        <?php if ($isAdmin): ?><th class="secondary">Owner</th><?php endif; ?>
-                        <th class="right nowrap secondary">Delivered</th>
+                        <?php if ($isAdmin): ?><th>Owner</th><?php endif; ?>
+                        <th class="right nowrap">Delivered</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -283,6 +284,25 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                        class="check-box">
                             </td>
                             <td class="shrink"><?php $value = $lead['fit_score']; require __DIR__ . '/partials/score.php'; ?></td>
+
+                            <?php /* The phone row. A deliberate one-liner rather than the
+                                     desktop cells squeezed down: company, then who, then
+                                     nothing else. Hidden above 720px, where the real columns
+                                     take over. Writing it out beats hiding six cells and
+                                     digging one name back out of a seventh with selectors
+                                     that break the moment a column is renamed. */ ?>
+                            <td class="cell-compact">
+                                <a href="<?= View::e(View::url('leads/' . $lead['id'])) ?>">
+                                    <span class="compact-name"><?= View::e($lead['company']) ?></span>
+                                    <?php if (!empty($lead['decision_maker'])): ?>
+                                        <span class="compact-sub"><?= View::e($lead['decision_maker']) ?></span>
+                                    <?php endif; ?>
+                                </a>
+                                <?php if ($lead['ghl_contact_id'] !== null): ?>
+                                    <span class="badge badge-high" title="In GoHighLevel">GHL</span>
+                                <?php endif; ?>
+                            </td>
+
                             <td>
                                 <div class="cell-primary">
                                     <a href="<?= View::e(View::url('leads/' . $lead['id'])) ?>"><?= View::e($lead['company']) ?></a>
@@ -325,7 +345,7 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                     </form>
                                 <?php endif; ?>
                             </td>
-                            <td class="nowrap secondary"><?= View::e($lead['market'] ?? '—') ?></td>
+                            <td class="nowrap"><?= View::e($lead['market'] ?? '—') ?></td>
                             <td class="cell-clip small dim"><?= View::e(mb_strimwidth((string) ($lead['why'] ?? ''), 0, 150, '…')) ?></td>
                             <td class="nowrap">
                                 <span class="badge badge-<?= View::e($lead['status']) ?>">
@@ -333,9 +353,9 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                 </span>
                             </td>
                             <?php if ($isAdmin): ?>
-                                <td class="nowrap small dim secondary"><?= View::e($lead['owner_name']) ?></td>
+                                <td class="nowrap small dim"><?= View::e($lead['owner_name']) ?></td>
                             <?php endif; ?>
-                            <td class="right nowrap small muted secondary"><?= View::e(Clock::display((string) $lead['created_at'], 'M j')) ?></td>
+                            <td class="right nowrap small muted"><?= View::e(Clock::display((string) $lead['created_at'], 'M j')) ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

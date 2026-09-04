@@ -253,6 +253,14 @@ final class Schema
             // than per install: three sellers sharing one sign-off would be
             // worse than none at all.
             ['users', 'email_signature', 'TEXT NULL'],
+            // The structured signature that replaced it. The old column stays:
+            // Signature::forUser falls back to it so an existing sign-off is
+            // carried into the new fields rather than silently disappearing.
+            ['users', 'signature_json', 'TEXT NULL'],
+            // The sub-account's own From address, captured when the connection
+            // is tested so the compose screen does not have to call the API to
+            // say who the mail goes out as.
+            ['users', 'ghl_from_email', 'VARCHAR(190) NULL'],
             // A dig runs in the background, so its state has to outlive the
             // request that started it.
             ['leads', 'dig_status', 'VARCHAR(20) NULL'],

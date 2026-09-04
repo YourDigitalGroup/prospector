@@ -9,6 +9,7 @@ use Prospector\Automations;
 use Prospector\Direct;
 use Prospector\GoHighLevel;
 use Prospector\Leads;
+use Prospector\Signature;
 use Prospector\Support\Request;
 use Prospector\Support\View;
 use Prospector\Users;
@@ -293,8 +294,10 @@ final class Workspace
             'connection' => $connection,
             'hasToken' => Users::ghlToken($user) !== '',
             'locationId' => (string) ($user['ghl_location_id'] ?? ''),
-            'signature' => Direct::signature($user),
-            'suggestedSignature' => Direct::suggestedSignature($user),
+            'signature' => Signature::forUser($user),
+            'signatureFields' => Signature::fields(),
+            'suggested' => Signature::suggested($user),
+            'signaturePreview' => Signature::html(Signature::forUser($user)),
         ], false);
     }
 
@@ -311,19 +314,55 @@ final class Workspace
         self::csrf();
 
         $user = self::resolveUser();
+        $userId = (int) $user['id'];
+        $current = Signature::forUser($user);
+        $image = (string) $current['image'];
+        $width = (int) ($current['image_w'] ?? 0);
+        $height = (int) ($current['image_h'] ?? 0);
+        $notes = [];
 
-        $signature = Request::raw('use_suggested') === '1'
-            ? Direct::suggestedSignature($user)
-            : trim(Request::raw('email_signature'));
+        // Removing the logo and replacing it are the same button in different
+        // states, so both land here.
+        if (Request::raw('remove_image') === '1') {
+            Signature::deleteImage($image);
+            $image = '';
+            $width = 0;
+            $height = 0;
+            $notes[] = 'Logo removed.';
+        } elseif (isset($_FILES['image']) && is_array($_FILES['image'])
+            && (int) ($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $upload = Signature::storeUpload($_FILES['image']);
 
-        Users::update((int) $user['id'], ['email_signature' => $signature === '' ? null : $signature]);
+            if (!$upload['ok']) {
+                Controller::flash('error', $upload['message']);
+                Controller::redirect(self::link('/ghl/connect', $user));
+            }
 
-        Controller::flash(
-            'success',
-            $signature === ''
-                ? 'Signature cleared — email will go out unsigned.'
-                : 'Signature saved.'
-        );
+            // The old one goes only once the new one is safely written.
+            Signature::deleteImage($image);
+            $image = $upload['image'];
+            $width = (int) ($upload['width'] ?? 0);
+            $height = (int) ($upload['height'] ?? 0);
+            $notes[] = 'Logo saved.';
+        }
+
+        $values = [];
+        foreach (array_keys(Signature::fields()) as $field) {
+            $values[$field] = Request::raw($field);
+        }
+
+        if (Request::raw('use_suggested') === '1') {
+            $values = Signature::suggested($user);
+        }
+
+        Signature::save($userId, $values, $image, $width, $height);
+
+        $saved = Signature::forUser(Users::find($userId));
+        $notes[] = Signature::isEmpty($saved)
+            ? 'Signature cleared — email will go out unsigned.'
+            : 'Signature saved.';
+
+        Controller::flash('success', implode(' ', $notes));
         Controller::redirect(self::link('/ghl/connect', $user));
     }
 
@@ -355,6 +394,13 @@ final class Workspace
         }
 
         $test = $client->testConnection();
+
+        // Captured here rather than fetched on every lead screen: it changes
+        // about as often as the token does.
+        Users::update((int) $user['id'], [
+            'ghl_from_email' => ($test['email'] ?? '') !== '' ? $test['email'] : null,
+        ]);
+
         Controller::flash($test['ok'] ? 'success' : 'error', $test['message']);
 
         Controller::redirect(self::link($test['ok'] ? '/ghl' : '/ghl/connect', $user));
