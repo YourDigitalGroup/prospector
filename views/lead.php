@@ -20,7 +20,9 @@ use Prospector\Support\View;
  * @var array{ok: bool, reason: string} $canSend
  * @var array{ok: bool, reason: string} $canEmail
  * @var array{ok: bool, reason: string} $canText
- * @var string $signature
+ * @var array<string, string> $signature
+ * @var string $signatureHtml
+ * @var string $fromAddress
  * @var string $defaultSubject
  * @var list<array<string, mixed>> $thread
  * @var string|null $threadError
@@ -529,7 +531,13 @@ if (!empty($lead['evidence'])) {
                  above. Shown for every lead, not only ones already pushed to
                  GoHighLevel — sending creates the contact if there is not one
                  yet. Gated on the owner's private integration, because that is
-                 what the mail actually leaves through. */ ?>
+                 what the mail actually leaves through.
+
+                 The form lives in a <dialog> so the whole message is on screen
+                 at once instead of squeezed into the side of a long page. The
+                 dialog is real markup, not built by script: with JavaScript off
+                 the button is a link to #compose and the form is still there
+                 and still posts. */ ?>
         <div class="card" id="send">
             <div class="card-head">
                 <h2>Send a message</h2>
@@ -556,57 +564,91 @@ if (!empty($lead['evidence'])) {
                     <p class="hint">No way to reach them yet — dig for contact details and this opens up.</p>
 
                 <?php else: ?>
-                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reply')) ?>"
-                          data-busy="Sending…"
-                          data-confirm="Send this now? It goes straight to them.">
-                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
-                        <input type="hidden" name="return" value="<?= View::e($leadUrl . '#send') ?>">
+                    <div class="btn-row">
+                        <?php if ($canEmail['ok']): ?>
+                            <a class="btn btn-primary" href="#compose" data-open-dialog="compose">
+                                <?php $name = 'mail'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+                                Send email
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($canText['ok']): ?>
+                            <a class="btn" href="#compose-sms" data-open-dialog="compose-sms">
+                                <?php $name = 'phone'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+                                Send a text
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                    <p class="hint mt">
+                        <?php if (!$canText['ok']): ?><?= View::e($canText['reason']) ?>
+                        <?php elseif (!$canEmail['ok']): ?><?= View::e($canEmail['reason']) ?>
+                        <?php else: ?>Goes immediately — there is no draft step here.<?php endif; ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+        </div>
 
-                        <div class="field-row">
-                            <div class="field">
-                                <label for="send-channel">Send as</label>
-                                <select id="send-channel" name="channel">
-                                    <?php if ($canEmail['ok']): ?>
-                                        <option value="Email">Email — <?= View::e($lead['email']) ?></option>
-                                    <?php endif; ?>
-                                    <?php if ($canText['ok']): ?>
-                                        <option value="SMS">Text — <?= View::e($lead['direct_phone'] ?: $lead['phone']) ?></option>
-                                    <?php endif; ?>
-                                </select>
-                                <?php if (!$canText['ok']): ?>
-                                    <div class="hint"><?= View::e($canText['reason']) ?></div>
-                                <?php elseif (!$canEmail['ok']): ?>
-                                    <div class="hint"><?= View::e($canEmail['reason']) ?></div>
-                                <?php endif; ?>
-                            </div>
+        <?php if ($canSend['ok'] && $canEmail['ok']): ?>
+            <dialog class="sheet" id="compose">
+                <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reply')) ?>"
+                      data-busy="Sending…">
+                    <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                    <input type="hidden" name="return" value="<?= View::e($leadUrl . '#send') ?>">
+                    <input type="hidden" name="channel" value="Email">
 
-                            <?php if ($canEmail['ok']): ?>
-                                <div class="field">
-                                    <label for="send-subject">Subject</label>
-                                    <input type="text" id="send-subject" name="subject" maxlength="255"
-                                           placeholder="<?= View::e($defaultSubject) ?>">
-                                    <div class="hint">Ignored on a text. Blank sends &ldquo;<?= View::e($defaultSubject) ?>&rdquo;.</div>
-                                </div>
+                    <div class="sheet-head">
+                        <h2>Send email</h2>
+                        <button type="button" class="icon-btn" data-close-dialog aria-label="Close">&times;</button>
+                    </div>
+
+                    <div class="sheet-body">
+                        <div class="field">
+                            <label>From</label>
+                            <?php if ($fromAddress !== ''): ?>
+                                <p class="fixed-value"><?= View::e($fromAddress) ?></p>
+                            <?php else: ?>
+                                <p class="fixed-value muted">Your GoHighLevel sub-account</p>
                             <?php endif; ?>
+                            <div class="hint">
+                                Set in GoHighLevel, not here — it is the sending domain their
+                                replies come back to.
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="send-to">To</label>
+                            <input type="email" id="send-to" name="to" required
+                                   value="<?= View::e($lead['email']) ?>">
+                            <div class="hint">
+                                Changing this corrects the address on the lead and in
+                                GoHighLevel, so the next message goes to the right place too.
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="send-subject">Subject</label>
+                            <input type="text" id="send-subject" name="subject" maxlength="255"
+                                   placeholder="<?= View::e($defaultSubject) ?>">
                         </div>
 
                         <div class="field">
                             <label for="send-body">Message</label>
-                            <textarea id="send-body" name="body" rows="6" required
+                            <textarea id="send-body" name="body" rows="9" required
                                       placeholder="Good talking on Tuesday — here is the one-pager I mentioned."></textarea>
                         </div>
 
-                        <?php if ($signature !== ''): ?>
-                            <p class="hint">Signed off with:</p>
-                            <pre class="sent-body mb"><?= View::e($signature) ?></pre>
+                        <?php if ($signatureHtml !== ''): ?>
+                            <details class="signature-preview">
+                                <summary>Signed off with your signature</summary>
+                                <div class="signature-render"><?= $signatureHtml ?></div>
+                            </details>
                         <?php else: ?>
                             <p class="hint">
-                                No sign-off set, so this goes out unsigned.
-                                <a href="<?= View::e(View::url('ghl/connect', $isAdmin ? ['user_id' => (int) $lead['user_id']] : [])) ?>">Add one</a>.
+                                No signature set, so this goes out unsigned.
+                                <a href="<?= View::e(View::url('ghl/connect', $isAdmin ? ['user_id' => (int) $lead['user_id']] : [])) ?>">Set one up</a>.
                             </p>
                         <?php endif; ?>
 
-                        <?php if ($unverifiedEmail && $canEmail['ok']): ?>
+                        <?php if ($unverifiedEmail): ?>
                             <div class="check mt">
                                 <input type="checkbox" id="send-unverified" name="confirm_unverified" value="1">
                                 <div>
@@ -618,18 +660,53 @@ if (!empty($lead['evidence'])) {
                                 </div>
                             </div>
                         <?php endif; ?>
+                    </div>
 
-                        <div class="btn-row mt">
-                            <button type="submit" class="btn btn-sm btn-primary">
-                                <?php $name = 'mail'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
-                                Send now
-                            </button>
-                            <span class="muted small">Goes immediately — there is no draft step here.</span>
+                    <div class="sheet-foot">
+                        <button type="submit" class="btn btn-primary">
+                            <?php $name = 'mail'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+                            Send now
+                        </button>
+                        <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+                    </div>
+                </form>
+            </dialog>
+        <?php endif; ?>
+
+        <?php if ($canSend['ok'] && $canText['ok']): ?>
+            <dialog class="sheet" id="compose-sms">
+                <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reply')) ?>"
+                      data-busy="Sending…">
+                    <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                    <input type="hidden" name="return" value="<?= View::e($leadUrl . '#send') ?>">
+                    <input type="hidden" name="channel" value="SMS">
+
+                    <div class="sheet-head">
+                        <h2>Send a text</h2>
+                        <button type="button" class="icon-btn" data-close-dialog aria-label="Close">&times;</button>
+                    </div>
+
+                    <div class="sheet-body">
+                        <div class="field">
+                            <label>To</label>
+                            <p class="fixed-value"><?= View::e($lead['direct_phone'] ?: $lead['phone']) ?></p>
                         </div>
-                    </form>
-                <?php endif; ?>
-            </div>
-        </div>
+
+                        <div class="field">
+                            <label for="sms-body">Message</label>
+                            <textarea id="sms-body" name="body" rows="5" required
+                                      placeholder="Following up on our call — free Thursday?"></textarea>
+                            <div class="hint">No signature on a text; it would eat the message.</div>
+                        </div>
+                    </div>
+
+                    <div class="sheet-foot">
+                        <button type="submit" class="btn btn-primary">Send now</button>
+                        <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+                    </div>
+                </form>
+            </dialog>
+        <?php endif; ?>
 
         <?php if ($lead['ghl_contact_id'] !== null): ?>
             <div class="card">

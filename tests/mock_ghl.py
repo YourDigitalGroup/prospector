@@ -226,7 +226,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.deny("Invalid Private Integration token.")
 
         if path.startswith("/locations/"):
-            return self.send_json({"location": {"id": LOCATION_ID, "name": "44i Digital — Partners"}})
+            # email is what the app captures as the From address the recipient
+            # sees, so the stand-in has to carry one for that path to be real.
+            return self.send_json({"location": {
+                "id": LOCATION_ID,
+                "name": "44i Digital — Partners",
+                "email": "partners@44idigital.example.com",
+            }})
 
         if path == "/contacts/":
             term = (query.get("query") or [""])[0].lower()
@@ -356,9 +362,15 @@ class Handler(BaseHTTPRequestHandler):
                     "direction": "outbound",
                     "messageType": payload.get("type", "SMS"),
                     "body": payload.get("message", ""),
-                    # Recorded so a test can assert the subject really reached
-                    # the API, not just that the app believed it sent one.
+                    # Recorded so a test can assert what really reached the API,
+                    # not just that the app believed it sent something. The HTML
+                    # part and the recipient override matter as much as the
+                    # subject: a signature image lives in one and a corrected
+                    # address in the other, and both are invisible from the app
+                    # side once the call has been made.
                     "subject": payload.get("subject", ""),
+                    "html": payload.get("html", ""),
+                    "emailTo": payload.get("emailTo", ""),
                     "dateAdded": "2026-08-12T09:00:00Z",
                 })
                 conversation["lastMessageBody"] = payload.get("message", "")

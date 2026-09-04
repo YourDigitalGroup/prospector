@@ -96,14 +96,21 @@ final class GoHighLevel
         $response = $this->request('GET', '/locations/' . rawurlencode($this->locationId));
 
         if (!$response['ok']) {
-            return ['ok' => false, 'message' => $response['error']];
+            return ['ok' => false, 'message' => $response['error'], 'email' => ''];
         }
 
-        $name = $response['data']['location']['name'] ?? $response['data']['name'] ?? null;
+        $location = $response['data']['location'] ?? $response['data'];
+        $name = $location['name'] ?? null;
+
+        // The sub-account's own address is what recipients see in the From
+        // line, so the compose screen can say whose mail this is going out as
+        // rather than leaving people to guess.
+        $email = $location['email'] ?? '';
 
         return [
             'ok' => true,
             'message' => 'Connected to ' . (is_string($name) ? $name : 'location ' . $this->locationId),
+            'email' => is_string($email) ? $email : '',
         ];
     }
 
@@ -475,8 +482,21 @@ final class GoHighLevel
      *
      * @return array{ok: bool, message: string}
      */
-    public function sendMessage(string $contactId, string $type, string $body, string $subject = ''): array
-    {
+    /**
+     * @param string|null $html  the HTML part, when it is more than the text
+     *                           with line breaks in — a signature with a logo
+     *                           in it, for instance
+     * @param string      $to    override the recipient address; empty sends to
+     *                           whatever address the contact record holds
+     */
+    public function sendMessage(
+        string $contactId,
+        string $type,
+        string $body,
+        string $subject = '',
+        ?string $html = null,
+        string $to = ''
+    ): array {
         $type = strtoupper($type) === 'EMAIL' ? 'Email' : 'SMS';
 
         if (trim($body) === '') {
@@ -491,7 +511,14 @@ final class GoHighLevel
 
         if ($type === 'Email') {
             $payload['subject'] = $subject !== '' ? $subject : 'Message from 44i';
-            $payload['html'] = nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8'));
+            $payload['html'] = $html ?? nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8'));
+
+            // emailTo is belt to the braces of having already corrected the
+            // contact's own address: if the field is honoured it decides, and
+            // if it is ignored the contact record now says the same thing.
+            if (trim($to) !== '') {
+                $payload['emailTo'] = trim($to);
+            }
         }
 
         $response = $this->request('POST', '/conversations/messages', $payload);

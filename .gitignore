@@ -27,3 +27,10 @@ Thumbs.db
 /worker/candidates-*.csv
 /worker/candidates-*.json
 /worker/worker.log
+
+# Signature logos, uploaded at runtime. Web-served so mail clients can fetch
+# them, and kept out of version control because they are per-install content
+# rather than part of the app. The FTP deploy adds files rather than mirroring,
+# so what is on the server survives a release.
+/assets/uploads/*
+!/assets/uploads/.gitkeep

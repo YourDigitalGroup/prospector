@@ -143,7 +143,14 @@ anything smaller and does not zoom back out, so tapping any field used to leave
 you pinching to read the rest of the screen. Everything steps up to 16px below
 900px; the desktop keeps its 13.5px.
 
-**Tables become cards below 720px.** A nine-column table at 390px either scrolls
+**The lead lists are one line each.** A row on **Leads** or **Outreach** is a checkbox, a fit
+score, and the company with the contact's name beside it — both clipping rather than wrapping,
+because a wrapped row is not a one-line row. Everything else is one tap away on the lead. The phone
+row is written into the markup as its own cell rather than assembled by hiding six of the desktop
+ones and digging a name back out of a seventh, which is a set of selectors that breaks the moment a
+column is renamed.
+
+**Every other table becomes cards below 720px.** A nine-column table at 390px either scrolls
 sideways — burying Status off-screen where nobody finds it — or wraps company
 names one word per line. Each row becomes a card with a caption per line, and
 `assets/js/app.js` copies those captions off the `<th>` at load, so every table
@@ -451,12 +458,24 @@ rule that first added it.
 
 ### Emailing somebody directly
 
-**Send a message**, on every lead screen. Write a subject and a body, press send, and it goes —
-there is no draft or approval step, because this is the reply to something they said or the
-follow-up after a call, not a sequence. The cadence in **Outreach** is still the other half of the
-job and is untouched by this.
+**Send email**, on every lead screen. It opens a dialog with the address it is going *from*, the
+address it is going *to*, a subject and a body; press send and it goes. There is no draft or
+approval step, because this is the reply to something they said or the follow-up after a call, not
+a sequence. The cadence in **Outreach** is still the other half of the job and is untouched by this.
 
-Three things are worth knowing about it.
+The **from** address is read-only and comes from the GoHighLevel sub-account, captured when the
+connection is tested. It is not ours to change: it is the sending domain their replies come back to.
+
+The **to** address is editable, and editing it *corrects the lead* rather than overriding one send.
+That is deliberate. GoHighLevel addresses a message by contact id, so an override its API declined
+to honour would send to the old address while the screen said otherwise — wrong recipient, silently,
+is the one failure this must not have. So a corrected address is written to the lead, pushed to the
+GoHighLevel contact, and passed as `emailTo` as well. All three say the same thing.
+
+The dialog is real `<dialog>` markup that is already on the page. With JavaScript off the button is
+a link to `#compose` and the form still posts; it just sits inline instead of over the page.
+
+Three more things are worth knowing about it.
 
 **It needs the owner's GoHighLevel private integration**, and says so plainly when there is not one
 rather than hiding. Everything leaves through that seller's own sub-account. Prospector has SMTP
@@ -475,9 +494,36 @@ of other addresses at the domain and never confirmed; bulk sends refuse it outri
 instead, because a deliberate one-off to a person you picked is a different decision. A lead with no
 address and no phone gets an explanation rather than a box.
 
-Each person sets their own sign-off under **GoHighLevel → Connection**, appended to anything sent
-this way. It is per user because three sellers sharing one signature would be worse than none.
-A text never gets one — it would eat the message. Cadence copy writes its own and is left alone.
+### Signatures
+
+Each person sets their own under **GoHighLevel → Connection**: name, title, company, phone, email,
+website, one free line, and a logo or headshot. Per user, because three sellers sharing one
+signature would be worse than none. A text never gets one — it would eat the message — and cadence
+copy writes its own sign-off, so this does not touch it.
+
+Structured fields rather than a free-text box. The logo has to render as HTML for it to appear at
+all, and letting people paste their own HTML into mail going out over their own sending domain is a
+way to end up debugging somebody's stray `</table>`. Fields in, a consistent block out — a
+table-based, inline-styled one, because mail clients strip `<style>`, ignore flexbox, and Outlook
+renders through Word.
+
+Three things about the image:
+
+- **It is re-encoded, never stored as uploaded.** The file is decoded with GD and written back out
+  as a fresh PNG, so an EXIF payload, a polyglot that is also valid script, or a malformed header
+  aimed at an image parser does not survive the round trip. The bytes served are bytes this
+  application wrote. `assets/uploads/signatures/` also carries an `.htaccess` turning execution off.
+- **It is small on purpose** — 260×90 at most, a square headshot landing at 90×90. A signature logo
+  sits next to four lines of type in a reading pane that is often 500px wide, and anything bigger
+  pushes the name and phone number off the side.
+- **It is served by absolute URL**, because the recipient's mail client fetches it from outside. A
+  `data:` URI would be easier and is refused by Gmail, Outlook and Apple Mail alike. That is also
+  why `Settings::publicUrl()` exists: a cadence email sent by cron has no HTTP request to derive a
+  host from, so the last host a real browser used is remembered instead of embedding
+  `http://localhost`.
+
+Uploads live in `assets/uploads/`, which is git-ignored. The FTP deploy adds files rather than
+mirroring, so what is on the server survives a release.
 
 ### The thread
 
@@ -570,6 +616,7 @@ app/
   LeadForm.php         the fields and rules for a lead typed in by hand
   Outreach.php         the cadence spec and the copywriting call
   Direct.php           one-off email and SMS to a lead, sent on the spot
+  Signature.php        the per-user sign-off, its logo upload and its HTML
   LocalModel.php       the OpenAI-compatible client for a local model server
   Automations.php      enrolment rules, the sweep, and who is in what
   Emails.php           email rows, the approve/send state machine, scheduled sends

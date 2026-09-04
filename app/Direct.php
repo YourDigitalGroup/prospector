@@ -111,6 +111,27 @@ final class Direct
             return ['ok' => false, 'message' => $reachable['reason']];
         }
 
+        // Somebody corrected the address in the compose box. Applied to the lead
+        // before anything is sent, and pushed to the GoHighLevel contact below,
+        // so the address that receives this is the address on file afterwards.
+        //
+        // Correcting rather than overriding for one send is the deliberate
+        // choice: GoHighLevel addresses a message by contact id, so an override
+        // that its API declined to honour would send to the old address while
+        // the screen said otherwise. Wrong recipient, silently, is the one
+        // failure this must not have.
+        $retarget = trim((string) ($message['to'] ?? ''));
+
+        if ($channel === 'Email' && $retarget !== '' && strcasecmp($retarget, (string) $lead['email']) !== 0) {
+            if (filter_var($retarget, FILTER_VALIDATE_EMAIL) === false) {
+                return ['ok' => false, 'message' => '"' . $retarget . '" is not a valid email address.'];
+            }
+
+            Leads::setEmail((int) $lead['id'], $retarget, 'verified', $actorId);
+            $lead['email'] = $retarget;
+            $lead['email_confidence'] = 'verified';
+        }
+
         // A 'pattern' address was inferred from the shape of other addresses at
         // the domain and never confirmed. Bulk sends refuse it outright; a
         // deliberate one-off to somebody you picked is a different decision, so
@@ -142,18 +163,52 @@ final class Direct
             Leads::addActivity($leadId, $actorId, 'ghl', 'Pushed to GoHighLevel to send a message');
         }
 
+        // Keep GoHighLevel's copy of the address in step with ours. Done after
+        // the contact exists, and its failure is not fatal: emailTo below still
+        // names the right recipient, and a lead whose address we could not
+        // write back is better than a send that did not happen.
+        if ($channel === 'Email' && $retarget !== '' && $contactId !== '') {
+            $client->updateContact($contactId, ['email' => (string) $lead['email']]);
+        }
+
         $subject = trim((string) ($message['subject'] ?? ''));
         if ($channel === 'Email' && $subject === '') {
             $subject = self::defaultSubject($lead);
         }
 
+        $signature = Signature::forUser($owner);
+        $wantsSignature = ($message['signature'] ?? true) !== false;
+
         // A signature belongs on an email and not on a text, where it would eat
         // most of the message and read as a machine wrote it.
-        $outgoing = $channel === 'Email' && ($message['signature'] ?? true) !== false
-            ? self::signed($body, $owner)
-            : $body;
+        $outgoing = $body;
+        $html = null;
 
-        $result = $client->sendMessage($contactId, $channel, $outgoing, $subject);
+        if ($channel === 'Email') {
+            $text = $wantsSignature ? Signature::text($signature) : '';
+            $outgoing = $text !== '' ? rtrim($body) . "\n\n" . $text : $body;
+
+            // The HTML part is built rather than derived from the text, because
+            // the signature can hold a logo and a link, and nl2br over escaped
+            // text cannot express either.
+            $signatureHtml = $wantsSignature ? Signature::html($signature) : '';
+            $html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;">'
+                . nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8'))
+                . '</div>'
+                . ($signatureHtml !== ''
+                    ? '<div style="padding-top:18px;margin-top:16px;border-top:1px solid #e3e7ec;">'
+                        . $signatureHtml . '</div>'
+                    : '');
+        }
+
+        $result = $client->sendMessage(
+            $contactId,
+            $channel,
+            $outgoing,
+            $subject,
+            $html,
+            $channel === 'Email' ? (string) $lead['email'] : ''
+        );
 
         if (!$result['ok']) {
             return ['ok' => false, 'message' => $result['message']];
@@ -200,40 +255,28 @@ final class Direct
     }
 
     /**
-     * The body with the owner's sign-off on the end.
-     *
-     * Left alone if the signature is already in there, so re-sending an edited
-     * draft that was signed once does not sign it twice.
+     * How this owner's email is signed, for the compose screen to show.
      *
      * @param array<string, mixed>|null $owner
+     * @return array<string, string>
      */
-    public static function signed(string $body, ?array $owner): string
+    public static function signature(?array $owner): array
     {
-        $signature = self::signature($owner);
-
-        if ($signature === '' || str_contains($body, $signature)) {
-            return $body;
-        }
-
-        return rtrim($body) . "\n\n" . $signature;
-    }
-
-    /** @param array<string, mixed>|null $owner */
-    public static function signature(?array $owner): string
-    {
-        return trim((string) ($owner['email_signature'] ?? ''));
+        return Signature::forUser($owner);
     }
 
     /**
-     * What a signature says when nobody has written one, offered on the setup
-     * screen as a starting point rather than applied silently — a sign-off
-     * nobody chose is worse than none.
+     * The address the recipient will see this as coming from.
      *
-     * @param array<string, mixed> $owner
+     * GoHighLevel sends as the sub-account, so this is its address rather than
+     * anything Prospector controls. Empty until a connection has been tested,
+     * which is when it gets captured.
+     *
+     * @param array<string, mixed>|null $owner
      */
-    public static function suggestedSignature(array $owner): string
+    public static function fromAddress(?array $owner): string
     {
-        return trim((string) $owner['name']) . "\n44i\n" . trim((string) $owner['email']);
+        return trim((string) ($owner['ghl_from_email'] ?? ''));
     }
 
     private static function channel(string $channel): string

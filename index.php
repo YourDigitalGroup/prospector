@@ -13,6 +13,7 @@ use Prospector\Auth;
 use Prospector\Http\Controller;
 use Prospector\Http\Outbox;
 use Prospector\Http\Workspace;
+use Prospector\Support;
 use Prospector\Support\Request;
 use Prospector\Support\View;
 
@@ -27,6 +28,10 @@ if (preg_match('#^/api/([a-z_]+)$#', $path, $apiMatch) === 1) {
 }
 
 Auth::start();
+
+// Email sent by cron has no request to work out the site's own address from, so
+// the last address a browser used is kept. Almost always a no-op.
+Support\Settings::rememberPublicUrl(View::baseUrl());
 
 View::share([
     'currentPath' => $path,

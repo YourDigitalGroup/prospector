@@ -825,6 +825,82 @@ fieldset { border: 0; margin: 0; padding: 0; }
     .topbar { padding: 10px 14px; }
 }
 
+/* ---------------------------------------------------------------- sheets
+   The compose dialog. A sheet rather than a centred box: on a phone it comes
+   up from the bottom edge and fills the screen, which is where a full-height
+   form belongs, and on a desktop it settles into a centred panel. */
+
+dialog.sheet {
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    width: min(560px, calc(100% - 32px));
+    max-height: min(85vh, 780px);
+    overflow: hidden;
+}
+
+dialog.sheet::backdrop { background: rgba(0, 0, 0, .55); }
+
+dialog.sheet form { display: flex; flex-direction: column; max-height: inherit; }
+
+.sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.sheet-head h2 { font-size: 16px; }
+
+.sheet-body { padding: 16px; overflow-y: auto; flex: 1 1 auto; }
+
+.sheet-foot {
+    display: flex;
+    gap: 9px;
+    padding: 13px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+}
+
+/* Something the form states but does not let you change. Reads as a value
+   rather than as a disabled input, which would invite clicking at it. */
+.fixed-value {
+    margin: 0;
+    padding: 8px 11px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    font-size: 13.5px;
+    color: var(--text-dim);
+}
+
+.signature-preview { margin-top: 4px; }
+.signature-preview summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 6px 0;
+}
+/* The signature is rendered with the inline colours it will carry into an
+   inbox, so it is shown on the light ground it was written for rather than
+   grey-on-grey inside a dark panel. */
+.signature-render {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    overflow-x: auto;
+}
+.signature-render img { max-width: 100%; height: auto; }
+
+/* The phone row on a list screen. Written into the markup as its own cell and
+   hidden here, so above 720px the real columns are what you see. */
+.cell-compact { display: none; }
+
 /* Visible only to a screen reader. */
 .sr-only {
     position: absolute;
@@ -936,7 +1012,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
     table.data thead { display: none; }
     table.data tbody { display: block; }
 
-    table.data tbody tr {
+    table.data:not(.compact) tbody tr {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -947,7 +1023,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
     table.data tbody tr:last-child { border-bottom: 0; }
     table.data tbody tr:hover { background: none; }
 
-    table.data tbody td {
+    table.data:not(.compact) tbody td {
         display: block;
         width: 100%;
         padding: 3px 0;
@@ -957,9 +1033,9 @@ fieldset { border: 0; margin: 0; padding: 0; }
     /* The checkbox and the fit score are controls, not facts. They sit
        together on the first line, where a table would have put them, and the
        company name lands underneath as the card's headline. */
-    table.data tbody td.shrink { width: auto; padding: 0; }
+    table.data:not(.compact) tbody td.shrink { width: auto; padding: 0; }
 
-    table.data tbody td[data-label]::before {
+    table.data:not(.compact) tbody td[data-label]::before {
         content: attr(data-label);
         display: block;
         font-size: 10.5px;
@@ -973,38 +1049,110 @@ fieldset { border: 0; margin: 0; padding: 0; }
     /* A card should not carry an empty labelled line, nor one whose whole
        content is the em dash a table cell prints to hold its column open.
        app.js marks those; see the note there. */
-    table.data tbody td:empty,
-    table.data tbody td[data-blank],
-    table.data tbody .cell-sub[data-blank] { display: none; }
-
-    /* Nor every column the desktop table has room for. A card that lists all
-       nine, each with its own caption, is 500px of mostly-nothing per lead —
-       "MARKET —", "OWNER Scott", "DELIVERED Sep 4" repeated down the page. The
-       ones marked secondary come off on a phone; they are all one tap away on
-       the lead itself. What is left is what you actually choose from: score,
-       company, who, why, and where it stands. */
-    table.data .secondary { display: none; }
+    table.data:not(.compact) tbody td:empty,
+    table.data:not(.compact) tbody td[data-blank],
+    table.data:not(.compact) tbody .cell-sub[data-blank] { display: none; }
 
     /* The checkbox, the score and the company name caption themselves. A line
        reading "COMPANY" above the company name is noise. */
-    table.data tbody td.shrink::before,
-    table.data tbody td:has(.cell-primary)::before { display: none; }
+    table.data:not(.compact) tbody td.shrink::before,
+    table.data:not(.compact) tbody td:has(.cell-primary)::before { display: none; }
 
     /* The company name is the card's tap target, so give it a real one. */
-    .cell-primary a { display: inline-flex; align-items: center; min-height: 44px; }
+    table.data:not(.compact) .cell-primary a { display: inline-flex; align-items: center; min-height: 44px; }
+
+    /* ---- lists marked .compact get one line per row ------------------
+       The card layout was right for a table that had to be readable at all,
+       but a lead list is something you scan: nine cards of captions is a lot
+       of thumb for "which of these do I call". A row is a checkbox, a score
+       and a name, and everything else is one tap away. */
+    table.data.compact tbody tr {
+        /* The card rules no longer reach this table, so it declares its own
+           box rather than inheriting one. */
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 14px;
+        min-height: 52px;
+    }
+
+    /* Everything the desktop shows comes off; the purpose-built cell replaces
+       the lot. */
+    table.data.compact tbody td { display: none; }
+    /* min-width keeps the column of checkboxes straight when a row has none —
+       on the outreach list a lead that cannot be sent to has an empty cell,
+       and a zero-width one pulls that row out of line with the rest. */
+    table.data.compact tbody td.shrink {
+        display: block;
+        width: auto;
+        min-width: 22px;
+        padding: 0;
+    }
+    table.data.compact tbody td::before { content: none; }
+
+    table.data.compact .cell-compact {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        /* min-width:0 is what actually lets the text truncate: a flex item
+           refuses to shrink below its content without it. */
+        min-width: 0;
+        flex: 1 1 auto;
+        padding: 0;
+    }
+
+    /* Written long enough to out-specify the touch rule above, which makes
+       every link in a table inline-block — that turned the two spans into
+       inline boxes and wrapped the row onto a second line, which is the one
+       thing a one-line row must not do. */
+    table.data.compact .cell-compact > a {
+        display: flex;
+        align-items: baseline;
+        gap: 7px;
+        min-width: 0;
+        flex: 1 1 auto;
+        padding: 9px 0;
+    }
+    table.data.compact .cell-compact > a:hover { text-decoration: none; }
+
+    /* The company takes the room it needs and gives the rest to the name; both
+       clip rather than wrap, because a wrapped row is not a one-line row. */
+    .compact-name {
+        font-weight: 600;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        /* min-width:0 as well as flex-shrink: without it the company name
+           refuses to go below its natural width and pushes the person off the
+           end instead of both clipping. */
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+    .compact-sub {
+        font-size: 12.5px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .cell-compact .badge { flex: 0 0 auto; }
 
     /* Nine cards of 150-character prose is a very long page. Clamped to two
        lines rather than hidden — it is the column that decides whether a lead
        is worth opening, so losing it would defeat the list. */
-    table.data tbody td.cell-clip:not(:empty):not([data-blank]) {
+    table.data:not(.compact) tbody td.cell-clip:not(:empty):not([data-blank]) {
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
 
-    table.data td.nowrap { white-space: normal; }
-    table.data td.right { text-align: left; }
+    table.data:not(.compact) td.nowrap { white-space: normal; }
+    table.data:not(.compact) td.right { text-align: left; }
     .cell-clip { max-width: none; }
 
     /* Filters fold away. Eight of them stacked two-up fill the screen before a
@@ -1041,6 +1189,17 @@ fieldset { border: 0; margin: 0; padding: 0; }
     .content { padding: 12px; }
     .card-head { flex-wrap: wrap; gap: 4px; }
     h1 { font-size: 22px; }
+
+    /* Full-height sheet off the bottom edge, which is where a thumb is. */
+    dialog.sheet {
+        width: 100%;
+        max-width: 100%;
+        max-height: 92vh;
+        margin: auto 0 0;
+        border-radius: var(--radius) var(--radius) 0 0;
+        border-bottom: 0;
+    }
+    .sheet-foot .btn { flex: 1 1 auto; justify-content: center; }
 }
 
 @media print {

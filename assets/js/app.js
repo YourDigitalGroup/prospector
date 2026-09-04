@@ -357,6 +357,41 @@
         button.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 
+    // ---- dialogs ---------------------------------------------------------
+    // The compose sheets. Real <dialog> markup that is already on the page, so
+    // with no JavaScript the button is a link to #compose and the form still
+    // works — it just sits inline instead of over the page.
+    document.addEventListener('click', function (event) {
+        var opener = event.target.closest('[data-open-dialog]');
+
+        if (opener) {
+            var dialog = document.getElementById(opener.getAttribute('data-open-dialog'));
+            if (!dialog || typeof dialog.showModal !== 'function') return;
+
+            event.preventDefault();
+            dialog.showModal();
+
+            // Straight into the message: the addresses and the subject are
+            // usually already right, and a cursor in the first field would mean
+            // tabbing past three of them every time.
+            var body = dialog.querySelector('textarea');
+            if (body) body.focus();
+            return;
+        }
+
+        var closer = event.target.closest('[data-close-dialog]');
+        if (closer) {
+            var open = closer.closest('dialog');
+            if (open) open.close();
+            return;
+        }
+
+        // Clicking the backdrop closes it. The dialog element itself fills the
+        // whole viewport, so a click that landed on it rather than on anything
+        // inside it was a click outside the sheet.
+        if (event.target.tagName === 'DIALOG') event.target.close();
+    });
+
     // ---- digging takes 20-40s, so say so rather than looking dead --------
     var digForm = document.querySelector('[data-dig-form]');
     if (digForm) {

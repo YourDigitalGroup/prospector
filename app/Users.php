@@ -98,7 +98,7 @@ final class Users
         $allowed = [
             'name', 'email', 'role', 'requires_password', 'loop', 'geography',
             'daily_email', 'autorun', 'active', 'ghl_location_id', 'ghl_pipeline_id',
-            'email_signature',
+            'email_signature', 'signature_json', 'ghl_from_email',
         ];
 
         $update = [];
