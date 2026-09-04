@@ -825,6 +825,117 @@ fieldset { border: 0; margin: 0; padding: 0; }
     .topbar { padding: 10px 14px; }
 }
 
+/* ------------------------------------------------------- action colours
+   Three buttons that say what they do by colour as well as by label, picked by
+   the owner. They carry their own ink rather than inheriting --accent-ink,
+   because each needs a different one to stay readable: near-black on the two
+   bright ones, white on the red.
+
+   Given explicitly rather than as a filter of --accent so they are the same in
+   both themes — a destructive button that changes colour with the theme is a
+   destructive button somebody eventually fails to recognise. */
+
+.btn-delete { background: #ff003c; border-color: #ff003c; color: #ffffff; font-weight: 650; }
+.btn-delete:hover:not(:disabled) { background: #e60036; border-color: #e60036; color: #ffffff; }
+
+.btn-ghl { background: #e400ff; border-color: #e400ff; color: #ffffff; font-weight: 650; }
+.btn-ghl:hover:not(:disabled) { background: #cc00e6; border-color: #cc00e6; color: #ffffff; }
+
+.btn-send { background: #00ff9c; border-color: #00ff9c; color: #06231a; font-weight: 650; }
+.btn-send:hover:not(:disabled) { background: #00e68c; border-color: #00e68c; color: #06231a; }
+
+/* The icon inside each takes the button's own ink rather than the link blue it
+   would otherwise inherit. */
+.btn-delete svg, .btn-ghl svg, .btn-send svg { color: currentColor; }
+
+/* ------------------------------------------------------------ bulk actions
+   A select and its button read as one control, so they sit in one box. */
+/* The phone's stand-in for the select-all in the table header. */
+.select-all {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+}
+
+.bulk-group { display: inline-flex; align-items: stretch; gap: 6px; }
+.bulk-group select { width: auto; min-width: 168px; }
+
+/* ---------------------------------------------------------- the composer */
+
+.composer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+}
+.composer-head label { margin: 0; }
+
+.toolbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+
+.tool {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 7px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.tool:hover { background: var(--surface-3); color: var(--text); }
+.tool-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+.tool-size { width: auto; padding: 4px 8px; font-size: 12.5px; height: 30px; min-height: 0; }
+
+.composer {
+    min-height: 168px;
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 11px 12px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.composer:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.composer:empty::before {
+    content: attr(data-placeholder);
+    color: var(--muted);
+    pointer-events: none;
+}
+.composer p { margin: 0 0 8px; }
+.composer ul, .composer ol { margin: 0 0 8px; padding-left: 22px; }
+.composer a { color: var(--link); }
+
+.merge-picker { width: auto; min-width: 220px; }
+
+.attach-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 5px; }
+.attach-list:empty { display: none; }
+.attach-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    font-size: 13px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.attach-row span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-row.is-uploading { color: var(--muted); font-style: italic; }
+.attach-row.is-failed { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+
 /* ---------------------------------------------------------------- sheets
    The compose dialog. A sheet rather than a centred box: on a phone it comes
    up from the bottom edge and fills the screen, which is where a full-height
@@ -845,6 +956,9 @@ dialog.sheet {
 dialog.sheet::backdrop { background: rgba(0, 0, 0, .55); }
 
 dialog.sheet form { display: flex; flex-direction: column; max-height: inherit; }
+
+/* A confirmation is a question, not a form, so it wants far less room. */
+dialog.sheet.sheet-sm { width: min(420px, calc(100% - 32px)); }
 
 .sheet-head {
     display: flex;

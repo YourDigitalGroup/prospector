@@ -489,13 +489,17 @@ final class GoHighLevel
      * @param string      $to    override the recipient address; empty sends to
      *                           whatever address the contact record holds
      */
+    /**
+     * @param list<string> $attachments absolute URLs; GoHighLevel fetches them
+     */
     public function sendMessage(
         string $contactId,
         string $type,
         string $body,
         string $subject = '',
         ?string $html = null,
-        string $to = ''
+        string $to = '',
+        array $attachments = []
     ): array {
         $type = strtoupper($type) === 'EMAIL' ? 'Email' : 'SMS';
 
@@ -519,6 +523,10 @@ final class GoHighLevel
             if (trim($to) !== '') {
                 $payload['emailTo'] = trim($to);
             }
+        }
+
+        if ($attachments !== []) {
+            $payload['attachments'] = array_values($attachments);
         }
 
         $response = $this->request('POST', '/conversations/messages', $payload);

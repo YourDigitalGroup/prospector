@@ -84,7 +84,10 @@ $active = static function (string $path) use ($currentPath): bool {
         } catch (e) {}
     </script>
 </head>
-<body>
+<?php /* The upload endpoint as an absolute URL, because the app can be
+         installed in a subdirectory and a relative fetch from /leads/12 would
+         go to /leads/attachments. */ ?>
+<body data-attach-endpoint="<?= View::e(View::url('attachments')) ?>">
 <div class="shell">
     <aside class="sidebar" data-collapsed="true">
         <div class="brand">

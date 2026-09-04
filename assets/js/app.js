@@ -48,7 +48,11 @@
     // ---- bulk selection --------------------------------------------------
     var bulkForm = document.querySelector('[data-bulk-form]');
     if (bulkForm) {
-        var master = bulkForm.querySelector('[data-check-all]');
+        // Two of these now: the one in the table header, and the one that
+        // replaces it on a phone where the header row is hidden. They have to
+        // move together or ticking one leaves the other saying otherwise.
+        var masters = Array.prototype.slice.call(bulkForm.querySelectorAll('[data-check-all]'));
+        var master = masters[0] || null;
         var boxes = Array.prototype.slice.call(bulkForm.querySelectorAll('[data-check-row]'));
         var bar = bulkForm.querySelector('[data-bulk-bar]');
         var countEl = bulkForm.querySelector('[data-bulk-count]');
@@ -60,36 +64,27 @@
             if (countEl) {
                 countEl.textContent = selected.length + (selected.length === 1 ? ' lead' : ' leads') + ' selected';
             }
-            if (master) {
-                master.checked = selected.length > 0 && selected.length === boxes.length;
-                master.indeterminate = selected.length > 0 && selected.length < boxes.length;
-            }
-        }
-
-        if (master) {
-            master.addEventListener('change', function () {
-                boxes.forEach(function (box) { box.checked = master.checked; });
-                refresh();
+            masters.forEach(function (box) {
+                box.checked = selected.length > 0 && selected.length === boxes.length;
+                box.indeterminate = selected.length > 0 && selected.length < boxes.length;
             });
         }
+
+        masters.forEach(function (control) {
+            control.addEventListener('change', function () {
+                boxes.forEach(function (box) { box.checked = control.checked; });
+                refresh();
+            });
+        });
 
         boxes.forEach(function (box) { box.addEventListener('change', refresh); });
         refresh();
 
-        // Only the delete action confirms. A blanket data-confirm on this form
-        // would make marking six leads "contacted" a two-step job, which is
-        // how people learn to click through warnings without reading them.
-        bulkForm.addEventListener('submit', function (event) {
-            var action = bulkForm.querySelector('[name="bulk_action"]');
-            if (!action || action.value !== 'delete') return;
-
-            var count = boxes.filter(function (b) { return b.checked; }).length;
-            var message = 'Delete ' + count + (count === 1 ? ' lead' : ' leads')
-                + ' for good? This cannot be undone, and their notes and history go too.'
-                + ' Archive instead if you only want them out of the working list.';
-
-            if (!window.confirm(message)) event.preventDefault();
-        });
+        // Deleting confirms; the rest do not. Marking six leads "contacted"
+        // being a two-step job is how people learn to click through warnings
+        // without reading them. The dialog itself is set up further down —
+        // window.confirm used to do this, and could not be styled, read as a
+        // browser malfunction on a phone, and was easy to dismiss by reflex.
     }
 
     // ---- auto-submit filters --------------------------------------------
@@ -373,8 +368,10 @@
 
             // Straight into the message: the addresses and the subject are
             // usually already right, and a cursor in the first field would mean
-            // tabbing past three of them every time.
-            var body = dialog.querySelector('textarea');
+            // tabbing past three of them every time. The composer is a
+            // contenteditable, not a textarea — looking only for the latter is
+            // how this quietly stopped focusing anything.
+            var body = dialog.querySelector('[data-composer], textarea');
             if (body) body.focus();
             return;
         }
@@ -390,6 +387,253 @@
         // whole viewport, so a click that landed on it rather than on anything
         // inside it was a click outside the sheet.
         if (event.target.tagName === 'DIALOG') event.target.close();
+    });
+
+    // ---- the message composer -------------------------------------------
+    // A contenteditable box with a formatting toolbar. The box is not the field
+    // that posts: its HTML is copied into a hidden input on submit, so the form
+    // has one obvious value and still works if any of this fails to run.
+    //
+    // Everything that comes back is rebuilt against an allow-list in
+    // Support\RichText before it is stored or sent. None of this is a security
+    // boundary; it is a typing aid.
+    document.querySelectorAll('[data-composer]').forEach(function (editor) {
+        var id = editor.getAttribute('data-composer');
+        var field = document.querySelector('[data-composer-value="' + id + '"]');
+        var form = editor.closest('form');
+        if (!field || !form) return;
+
+        function sync() {
+            // A box the browser considers empty still holds a stray <br>, which
+            // would post as a message with something in it.
+            var html = editor.innerHTML.trim();
+            field.value = /^(<br\s*\/?>)*$/i.test(html) ? '' : html;
+        }
+
+        editor.addEventListener('input', sync);
+        editor.addEventListener('blur', sync);
+        form.addEventListener('submit', sync);
+
+        // The placeholder is CSS on :empty, which a stray <br> defeats.
+        editor.addEventListener('keyup', function () {
+            if (/^(<br\s*\/?>)*$/i.test(editor.innerHTML.trim())) editor.innerHTML = '';
+        });
+    });
+
+    function activeComposer(el) {
+        var scope = el.closest('.sheet-body') || el.closest('form') || document;
+        return scope.querySelector('[data-composer]');
+    }
+
+    document.addEventListener('click', function (event) {
+        var tool = event.target.closest('.tool[data-format]');
+        if (!tool) return;
+
+        event.preventDefault();
+        var editor = activeComposer(tool);
+        if (!editor) return;
+
+        editor.focus();
+        var command = tool.getAttribute('data-format');
+
+        if (command === 'createLink') {
+            var url = window.prompt('Link to where?', 'https://');
+            if (!url || !/^https?:\/\/|^mailto:/i.test(url)) return;
+            document.execCommand('createLink', false, url);
+            return;
+        }
+
+        document.execCommand(command, false, null);
+    });
+
+    document.addEventListener('change', function (event) {
+        var size = event.target.closest('.tool-size');
+        if (!size || !size.value) return;
+
+        var editor = activeComposer(size);
+        if (!editor) return;
+
+        editor.focus();
+        document.execCommand('fontSize', false, size.value);
+    });
+
+    // ---- merge variables -------------------------------------------------
+    // Dropped in at the cursor, or on the end if the box was never focused.
+    document.addEventListener('change', function (event) {
+        var picker = event.target.closest('[data-merge-for]');
+        if (!picker || !picker.value) return;
+
+        var editor = document.querySelector('[data-composer="' + picker.getAttribute('data-merge-for') + '"]');
+        if (editor) {
+            editor.focus();
+            if (!document.execCommand('insertText', false, picker.value)) {
+                editor.appendChild(document.createTextNode(picker.value));
+            }
+            editor.dispatchEvent(new Event('input'));
+        }
+
+        picker.value = '';
+    });
+
+    // ---- attachments -----------------------------------------------------
+    // Uploaded as they are picked rather than with the message, so a 10MB file
+    // does not ride along with every failed send, and so the draft survives.
+    document.addEventListener('change', function (event) {
+        var input = event.target.closest('[data-attach-input]');
+        if (!input || !input.files || !input.files.length) return;
+
+        var id = input.getAttribute('data-attach-input');
+        var list = document.querySelector('[data-attach-list="' + id + '"]');
+        var form = input.closest('form');
+        if (!list || !form) return;
+
+        var csrf = form.querySelector('[name="csrf"]');
+        var files = Array.prototype.slice.call(input.files);
+        input.value = '';
+
+        files.forEach(function (file) {
+            var row = document.createElement('li');
+            row.className = 'attach-row is-uploading';
+            row.textContent = file.name + ' — uploading…';
+            list.appendChild(row);
+
+            var payload = new FormData();
+            payload.append('file', file);
+            payload.append('csrf', csrf ? csrf.value : '');
+
+            fetch(document.body.getAttribute('data-attach-endpoint') || 'attachments', {
+                method: 'POST',
+                body: payload,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(function (response) {
+                return response.json().catch(function () {
+                    return { ok: false, message: 'The server did not answer with JSON.' };
+                });
+            }).then(function (result) {
+                row.classList.remove('is-uploading');
+
+                if (!result || !result.ok) {
+                    row.classList.add('is-failed');
+                    row.textContent = file.name + ' — ' + ((result && result.message) || 'upload failed');
+                    return;
+                }
+
+                row.textContent = '';
+
+                var name = document.createElement('span');
+                name.textContent = result.name;
+                row.appendChild(name);
+
+                var value = document.createElement('input');
+                value.type = 'hidden';
+                value.name = 'attachments[]';
+                value.value = result.path;
+                row.appendChild(value);
+
+                var remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'linkish';
+                remove.textContent = 'Remove';
+                remove.addEventListener('click', function () { row.remove(); });
+                row.appendChild(remove);
+            }).catch(function () {
+                row.classList.remove('is-uploading');
+                row.classList.add('is-failed');
+                row.textContent = file.name + ' — upload failed';
+            });
+        });
+    });
+
+    // ---- the bulk composer picks up whatever is ticked -------------------
+    // The dialog's form is a sibling of the list's form, not a child of it —
+    // nesting forms is invalid and the browser drops the inner one. So the
+    // ticked ids are copied across when the dialog opens, and the count in the
+    // heading is filled in at the same time.
+    document.addEventListener('click', function (event) {
+        var opener = event.target.closest('[data-open-dialog="bulk-compose"]');
+        if (!opener) return;
+
+        var list = document.querySelector('[data-bulk-form]');
+        var form = document.querySelector('[data-bulk-recipients]');
+        if (!list || !form) return;
+
+        form.querySelectorAll('[data-recipient]').forEach(function (el) { el.remove(); });
+
+        var picked = Array.prototype.slice.call(list.querySelectorAll('[data-check-row]:checked'));
+
+        picked.forEach(function (box) {
+            var carry = document.createElement('input');
+            carry.type = 'hidden';
+            carry.name = 'ids[]';
+            carry.value = box.value;
+            carry.setAttribute('data-recipient', '');
+            form.appendChild(carry);
+        });
+
+        var label = picked.length + (picked.length === 1 ? ' lead' : ' leads');
+        form.querySelectorAll('[data-bulk-recipient-count]').forEach(function (el) {
+            el.textContent = label;
+        });
+        document.querySelectorAll('#bulk-compose [data-bulk-recipient-count]').forEach(function (el) {
+            el.textContent = label;
+        });
+    });
+
+    // ---- destructive confirmations --------------------------------------
+    // A styled dialog rather than window.confirm, which cannot be themed, reads
+    // as a browser malfunction on a phone, and is easy to dismiss by reflex.
+    // The form is only submitted when the dialog says so.
+    var pendingForm = null;
+
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+
+        var dialogId = form.getAttribute('data-confirm-dialog');
+        if (!dialogId || form.dataset.confirmed === 'yes') return;
+
+        var dialog = document.getElementById(dialogId);
+        if (!dialog || typeof dialog.showModal !== 'function') return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        pendingForm = form;
+
+        // The count is only known at the moment of asking.
+        var counter = dialog.querySelector('[data-confirm-count]');
+        if (counter) {
+            var picked = form.querySelectorAll('[data-check-row]:checked').length;
+            counter.textContent = picked + (picked === 1 ? ' lead' : ' leads');
+        }
+
+        dialog.showModal();
+    }, true);
+
+    document.addEventListener('click', function (event) {
+        if (event.target.closest('[data-confirm-go]')) {
+            var dialog = event.target.closest('dialog');
+            if (dialog) dialog.close();
+
+            if (pendingForm) {
+                var form = pendingForm;
+                pendingForm = null;
+                form.dataset.confirmed = 'yes';
+                // requestSubmit rather than submit(), so the submit listeners
+                // that carry the pressed button and show the busy state still
+                // run — submit() skips all of them.
+                if (form.requestSubmit) form.requestSubmit();
+                else form.submit();
+            }
+            return;
+        }
+
+        if (event.target.closest('[data-confirm-no]')) {
+            pendingForm = null;
+            var open = event.target.closest('dialog');
+            if (open) open.close();
+        }
     });
 
     // ---- digging takes 20-40s, so say so rather than looking dead --------
