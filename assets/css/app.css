@@ -628,6 +628,11 @@ input:focus, select:focus, textarea:focus {
 
 .check { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
 .check input { width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--accent); flex: 0 0 auto; }
+
+/* Row-selection boxes. A class rather than an inline style so the coarse-
+   pointer rule below can grow them — an inline style beats a stylesheet,
+   which is how these stayed 15px on a touchscreen. */
+.check-box { width: 15px; height: 15px; accent-color: var(--accent); }
 .check label { margin: 0; font-weight: 500; color: var(--text); }
 .check .hint { margin-top: 2px; }
 
@@ -818,6 +823,224 @@ fieldset { border: 0; margin: 0; padding: 0; }
     .kv { grid-template-columns: 1fr; gap: 2px; }
     .kv dd { margin-bottom: 8px; }
     .topbar { padding: 10px 14px; }
+}
+
+/* Visible only to a screen reader. */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* The stage picker on a pipeline card. Always present — it is the only way to
+   move a deal without a mouse — but quiet until you reach for it, so the card
+   still reads as a card rather than as a form. */
+.board-card-move { margin-top: 8px; }
+.board-card-move select {
+    font-size: 12px;
+    padding: 5px 8px;
+    background: var(--surface-2);
+    color: var(--text-dim);
+}
+
+/* Two hints for one control: which half is shown depends on whether dragging
+   is even possible. */
+.touch-only { display: none; }
+@media (pointer: coarse) {
+    .pointer-only { display: none; }
+    .touch-only { display: inline; }
+}
+
+/* ---- phones ------------------------------------------------------------
+   Everything below is about a 390px screen held in one hand. The sellers work
+   leads from their phones between calls, so this is not a courtesy breakpoint.
+
+   720px rather than 900px for the structural changes: a tablet in landscape
+   has room for a table, a phone does not, and the 900px rules above already
+   handle the sidebar for both. */
+
+@media (max-width: 900px) {
+    /* iOS Safari zooms the whole page in when you focus a field smaller than
+       16px, and does not zoom back out afterwards. Every input in the app was
+       13.5px, so tapping any of them left you pinching to read the rest of the
+       screen. This is the single most irritating thing about the app on a
+       phone and it costs nothing to fix. */
+    input[type="text"], input[type="email"], input[type="password"], input[type="number"],
+    input[type="search"], input[type="url"], input[type="tel"], select, textarea {
+        font-size: 16px;
+    }
+
+    .filters label { font-size: 11px; }
+
+    /* The topbar search sets its own font-size, so the generic rule above does
+       not reach it and it stays a zoom trigger. */
+    .search input[type="search"] { font-size: 16px; }
+}
+
+/* Touch targets. A mouse pointer lands where you aimed it; a fingertip covers
+   about 9mm, which is why Apple asks for 44px and Google for 48px.
+
+   Width first, pointer second. Pointer:coarse is the more precise question to
+   ask, but it is unreliable enough across emulators and desktop touchscreens
+   that leaning on it alone means the rule silently does not apply — which is
+   what happened here. Width is what the rest of this stylesheet keys off, and a
+   narrow window on a laptop gets bigger targets too, which is no loss.
+
+   Height only: a wide button is easy to hit already. */
+@media (max-width: 900px), (pointer: coarse) {
+    .btn { min-height: 44px; }
+    .btn-sm { min-height: 40px; }
+    .board-card-move select { font-size: 16px; }
+    input, select, textarea { min-height: 44px; }
+    textarea { min-height: 88px; }
+    .check input, .check-box { width: 22px; height: 22px; }
+
+    /* The two icon buttons in the chrome — open the navigation, switch the
+       theme — were 32px square. They are the only way to reach the rest of the
+       app on a phone, so they are the last things that should be fiddly. */
+    .icon-btn { min-width: 44px; min-height: 44px; }
+
+    /* A button styled as a link is still a button. "Dig for details" was a
+       17px-tall target sitting inside a list row. */
+    .linkish, .linklike { min-height: 40px; }
+
+    /* The address and phone on a lead are tap-to-mail and tap-to-call, which
+       makes them the two most-used targets on the screen and the two smallest:
+       a 15px line of type is a 15px target. Padding rather than height, so the
+       line box does not grow and push the layout around it. */
+    .kv dd a, table.data td a, .listy a, .thread a, .board-card a {
+        display: inline-block;
+        padding: 10px 0;
+    }
+}
+
+@media (max-width: 720px) {
+    /* Tables become cards.
+
+       A nine-column table at 390px either scrolls sideways — burying Status
+       and Delivered off-screen where nobody finds them — or wraps company
+       names one word per line. Neither is a list you can work from.
+
+       The row becomes a card and each cell a labelled line. Labels come from
+       app.js, which copies them off the <th> at load, so this works for every
+       table in the app and cannot drift out of step with a column that only
+       admins see. Without JS the tables stay tables and still scroll, which is
+       the behaviour this replaces rather than a new failure. */
+    .table-scroll { overflow-x: visible; }
+
+    table.data { display: block; }
+    table.data thead { display: none; }
+    table.data tbody { display: block; }
+
+    table.data tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px 10px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+    }
+    table.data tbody tr:last-child { border-bottom: 0; }
+    table.data tbody tr:hover { background: none; }
+
+    table.data tbody td {
+        display: block;
+        width: 100%;
+        padding: 3px 0;
+        border: 0;
+    }
+
+    /* The checkbox and the fit score are controls, not facts. They sit
+       together on the first line, where a table would have put them, and the
+       company name lands underneath as the card's headline. */
+    table.data tbody td.shrink { width: auto; padding: 0; }
+
+    table.data tbody td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 10.5px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--muted);
+        margin-bottom: 1px;
+    }
+
+    /* A card should not carry an empty labelled line, nor one whose whole
+       content is the em dash a table cell prints to hold its column open.
+       app.js marks those; see the note there. */
+    table.data tbody td:empty,
+    table.data tbody td[data-blank],
+    table.data tbody .cell-sub[data-blank] { display: none; }
+
+    /* Nor every column the desktop table has room for. A card that lists all
+       nine, each with its own caption, is 500px of mostly-nothing per lead —
+       "MARKET —", "OWNER Scott", "DELIVERED Sep 4" repeated down the page. The
+       ones marked secondary come off on a phone; they are all one tap away on
+       the lead itself. What is left is what you actually choose from: score,
+       company, who, why, and where it stands. */
+    table.data .secondary { display: none; }
+
+    /* The checkbox, the score and the company name caption themselves. A line
+       reading "COMPANY" above the company name is noise. */
+    table.data tbody td.shrink::before,
+    table.data tbody td:has(.cell-primary)::before { display: none; }
+
+    /* The company name is the card's tap target, so give it a real one. */
+    .cell-primary a { display: inline-flex; align-items: center; min-height: 44px; }
+
+    /* Nine cards of 150-character prose is a very long page. Clamped to two
+       lines rather than hidden — it is the column that decides whether a lead
+       is worth opening, so losing it would defeat the list. */
+    table.data tbody td.cell-clip:not(:empty):not([data-blank]) {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    table.data td.nowrap { white-space: normal; }
+    table.data td.right { text-align: left; }
+    .cell-clip { max-width: none; }
+
+    /* Filters fold away. Eight of them stacked two-up fill the screen before a
+       single lead is visible; the toggle button carries a count so a filter
+       left on is still obvious while the panel is shut. */
+    .filters.collapsible { display: none; }
+    .filters.collapsible.is-open { display: flex; }
+    .filters-toggle { margin: 12px 14px; }
+    .filters .field, .filters .field.grow { min-width: 0; flex: 1 1 45%; }
+
+    /* The bulk bar sticks to the bottom once something is selected. It lives
+       above the list, so on a phone you would otherwise tick six leads, scroll
+       back up past all of them, and only then choose an action. */
+    .bulkbar:not(.hidden) {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        border-top: 1px solid var(--border-strong);
+        border-bottom: 0;
+        box-shadow: 0 -6px 18px rgba(0, 0, 0, .18);
+    }
+    .bulkbar select, .bulkbar .btn { width: 100%; }
+    .bulkbar .count { width: 100%; }
+
+    /* Page actions: full width and stacked beats three buttons reflowing into
+       a ragged two-and-one. */
+    .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
+    .page-head-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .page-head-actions .btn { justify-content: center; }
+
+    /* Two side-by-side cards at 390px are two half-width cards. */
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+
+    .content { padding: 12px; }
+    .card-head { flex-wrap: wrap; gap: 4px; }
+    h1 { font-size: 22px; }
 }
 
 @media print {

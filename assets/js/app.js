@@ -299,6 +299,64 @@
         });
     }
 
+    // ---- tables become cards on a phone ---------------------------------
+    // Below 720px a nine-column table is unreadable: it either scrolls
+    // sideways or wraps company names one word per line. The stylesheet
+    // restacks each row as a card, and a card needs its own labels because the
+    // header row is gone.
+    //
+    // Copied from the <th> at load rather than written into each <td> by hand,
+    // for two reasons. Every table in the app gets it without touching sixteen
+    // templates, and a column that only some people see — the admin-only Owner
+    // column on the leads list — cannot fall out of step with its label, which
+    // is exactly what a hand-written data-label would eventually do.
+    document.querySelectorAll('table.data').forEach(function (table) {
+        var headers = Array.prototype.slice.call(table.querySelectorAll('thead th'))
+            .map(function (th) { return th.textContent.trim(); });
+
+        if (!headers.length) return;
+
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            Array.prototype.slice.call(row.children).forEach(function (cell, index) {
+                var label = headers[index];
+                // A blank header means the column is a control rather than a
+                // fact — the select-all checkbox — and labelling it would read
+                // as a field name that is not one.
+                if (label) cell.setAttribute('data-label', label);
+            });
+
+            // A table cell that has nothing to say still has to hold the column
+            // open, which is why so many of them print an em dash. A card has
+            // no column to hold open, so the dash becomes a caption with a
+            // shrug under it. Mark those so the stylesheet can drop them on a
+            // phone; the desktop table keeps its dashes.
+            row.querySelectorAll('td, .cell-sub').forEach(function (el) {
+                // Text only. A cell holding a checkbox has no text either, and
+                // marking that one blank hides it — which quietly removes bulk
+                // selection on every phone.
+                if (el.querySelector('input, button, a, select, textarea, svg, img')) return;
+
+                var text = (el.textContent || '').replace(/[\s—–-]/g, '');
+                if (text === '') el.setAttribute('data-blank', '');
+            });
+        });
+    });
+
+    // ---- the filter panel folds away on a phone -------------------------
+    // Eight filters stacked two-up fill a phone screen before a single lead is
+    // visible. Shut by default at that size, and the button says how many are
+    // actually narrowing the list so a forgotten filter is not invisible.
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-filters-toggle]');
+        if (!button) return;
+
+        var panel = document.querySelector('.filters.collapsible');
+        if (!panel) return;
+
+        var open = panel.classList.toggle('is-open');
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
     // ---- digging takes 20-40s, so say so rather than looking dead --------
     var digForm = document.querySelector('[data-dig-form]');
     if (digForm) {

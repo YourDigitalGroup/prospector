@@ -4,7 +4,9 @@ use Prospector\Auth;
 use Prospector\Support\View;
 
 /**
- * The columnized CRM: one column per pipeline stage, cards dragged between them.
+ * The columnized CRM: one column per pipeline stage. Cards are dragged between
+ * them with a mouse, or moved with the picker on the card — which is the only
+ * way that works on a touchscreen, where drag events never fire.
  *
  * @var string|null $error
  * @var list<array<string, mixed>> $pipelines
@@ -17,6 +19,10 @@ use Prospector\Support\View;
  */
 
 require __DIR__ . '/_head.php';
+
+// An admin looking at somebody else's sub-account has to keep ?user_id= on
+// every form that posts back, or the move lands in their own account.
+$wsQuery = $viewingOther ? ['user_id' => (int) $workspaceUser['id']] : [];
 
 $money = static function (mixed $value): string {
     return is_numeric($value) && (float) $value > 0 ? '$' . number_format((float) $value) : '';
@@ -106,6 +112,31 @@ $money = static function (mixed $value): string {
                                        ))) ?>">Open</a>
                                 <?php endif; ?>
                             </div>
+
+                            <?php /* Dragging is a mouse gesture. HTML5 drag events do not fire
+                                     on touch at all, so on a phone the board was read-only and
+                                     the hint under it was telling people to do something that
+                                     could not work. This picker does the same job without a
+                                     drag, which also makes the board usable from a keyboard.
+                                     It posts a normal form, so it works with no JavaScript
+                                     either. */ ?>
+                            <form method="post" class="board-card-move" draggable="false"
+                                  action="<?= View::e(View::url('ghl/move', $wsQuery)) ?>">
+                                <input type="hidden" name="csrf" value="<?= View::e(Auth::csrfToken()) ?>">
+                                <input type="hidden" name="opportunity_id" value="<?= View::e($card['id'] ?? '') ?>">
+                                <input type="hidden" name="pipeline_id" value="<?= View::e($pipeline['id'] ?? '') ?>">
+                                <label class="sr-only" for="move-<?= View::e($card['id'] ?? '') ?>">
+                                    Move <?= View::e($card['name'] ?? 'this deal') ?> to another stage
+                                </label>
+                                <select id="move-<?= View::e($card['id'] ?? '') ?>" name="stage_id" data-autosubmit>
+                                    <?php foreach ($stages as $option): ?>
+                                        <option value="<?= View::e($option['id']) ?>"
+                                            <?= $option['id'] === $stage['id'] ? 'selected' : '' ?>>
+                                            <?= View::e($option['name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
                         </article>
                     <?php endforeach; ?>
                 </div>
@@ -113,5 +144,9 @@ $money = static function (mixed $value): string {
         <?php endforeach; ?>
     </div>
 
-    <p class="hint mt">Drag a card to another column to move the deal in GoHighLevel.</p>
+    <p class="hint mt">
+        <span class="pointer-only">Drag a card to another column, or use</span>
+        <span class="touch-only">Use</span>
+        the stage picker on the card, to move the deal in GoHighLevel.
+    </p>
 <?php endif; ?>

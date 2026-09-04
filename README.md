@@ -133,6 +133,51 @@ either way. See `assets/fonts/README.md`.
 
 ---
 
+## On a phone
+
+The sellers work leads between calls, so the phone is a first-class screen
+rather than a fallback. Four things make it one.
+
+**No field is under 16px.** iOS Safari zooms the whole page in when you focus
+anything smaller and does not zoom back out, so tapping any field used to leave
+you pinching to read the rest of the screen. Everything steps up to 16px below
+900px; the desktop keeps its 13.5px.
+
+**Tables become cards below 720px.** A nine-column table at 390px either scrolls
+sideways — burying Status off-screen where nobody finds it — or wraps company
+names one word per line. Each row becomes a card with a caption per line, and
+`assets/js/app.js` copies those captions off the `<th>` at load, so every table
+in the app gets it without touching sixteen templates and a column only admins
+see cannot fall out of step with its label. Columns marked `secondary` in the
+markup come off entirely: Market, Owner and Delivered are all one tap away on
+the lead. Cells whose whole content is the em dash a table prints to hold a
+column open are dropped too, rather than becoming a caption with a shrug under
+it. Without JavaScript the tables stay tables and still scroll, which is the
+behaviour this replaces rather than a new failure.
+
+**Targets are 44px.** A fingertip covers about 9mm. The two chrome buttons were
+32px square, the tap-to-call and tap-to-email links on a lead were 15px lines of
+type, and "Dig for details" was 17px. The rule keys off width first and
+`pointer: coarse` second — pointer alone is unreliable enough across emulators
+and desktop touchscreens that it silently does not apply, which is exactly what
+happened the first time.
+
+**The filter panel folds away**, with a count on the button so a filter left on
+is still obvious while the panel is shut, and the bulk bar sticks to the bottom
+of the screen once something is selected — it sits above the list, so otherwise
+you would tick six leads, scroll back up past all of them, and only then choose
+an action.
+
+### The pipeline board
+
+Cards are dragged between stages with a mouse. HTML5 drag events do not fire on
+touch at all, so on a phone the board was read-only while the hint underneath
+told you to drag — so every card also carries a stage picker, which posts a
+normal form and works from a touchscreen, from a keyboard, and with no
+JavaScript. The hint says whichever half applies.
+
+---
+
 ## Signing in
 
 Three accounts are created on first boot, and only on first boot — the seed is skipped the moment
