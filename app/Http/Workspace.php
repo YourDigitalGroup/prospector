@@ -6,6 +6,7 @@ namespace Prospector\Http;
 
 use Prospector\Auth;
 use Prospector\Automations;
+use Prospector\Direct;
 use Prospector\GoHighLevel;
 use Prospector\Leads;
 use Prospector\Support\Request;
@@ -292,7 +293,38 @@ final class Workspace
             'connection' => $connection,
             'hasToken' => Users::ghlToken($user) !== '',
             'locationId' => (string) ($user['ghl_location_id'] ?? ''),
+            'signature' => Direct::signature($user),
+            'suggestedSignature' => Direct::suggestedSignature($user),
         ], false);
+    }
+
+    /**
+     * Save the sign-off that goes on the end of this person's outbound email.
+     *
+     * Its own route rather than a field on the connect form, so editing a
+     * signature does not mean re-posting a credential — and so it can be
+     * changed by someone who has not connected yet.
+     */
+    public static function signature(): void
+    {
+        Controller::requireLogin();
+        self::csrf();
+
+        $user = self::resolveUser();
+
+        $signature = Request::raw('use_suggested') === '1'
+            ? Direct::suggestedSignature($user)
+            : trim(Request::raw('email_signature'));
+
+        Users::update((int) $user['id'], ['email_signature' => $signature === '' ? null : $signature]);
+
+        Controller::flash(
+            'success',
+            $signature === ''
+                ? 'Signature cleared — email will go out unsigned.'
+                : 'Signature saved.'
+        );
+        Controller::redirect(self::link('/ghl/connect', $user));
     }
 
     public static function connectSave(): void

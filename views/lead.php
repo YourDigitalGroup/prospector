@@ -16,6 +16,12 @@ use Prospector\Support\View;
  * @var int $cadenceSteps
  * @var array{ok: bool, reason: string} $deliverable
  * @var bool $unverifiedEmail
+ * @var array<string, mixed>|null $sendAs
+ * @var array{ok: bool, reason: string} $canSend
+ * @var array{ok: bool, reason: string} $canEmail
+ * @var array{ok: bool, reason: string} $canText
+ * @var string $signature
+ * @var string $defaultSubject
  * @var list<array<string, mixed>> $thread
  * @var string|null $threadError
  * @var list<array<string, mixed>> $workflows
@@ -23,6 +29,7 @@ use Prospector\Support\View;
  * @var string $csrf
  */
 
+$isAdmin = Auth::isAdmin();
 $leadUrl = '/leads/' . $lead['id'];
 $evidence = [];
 if (!empty($lead['evidence'])) {
@@ -405,10 +412,10 @@ if (!empty($lead['evidence'])) {
                             <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
                             <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
                             <select name="owner_id" aria-label="Reassign to" style="width:auto">
-                                <?php foreach ($owners as $owner): ?>
-                                    <option value="<?= (int) $owner['id'] ?>"
-                                        <?= (int) $owner['id'] === (int) $lead['user_id'] ? 'selected' : '' ?>>
-                                        <?= View::e($owner['name']) ?>
+                                <?php foreach ($owners as $candidate): ?>
+                                    <option value="<?= (int) $candidate['id'] ?>"
+                                        <?= (int) $candidate['id'] === (int) $lead['user_id'] ? 'selected' : '' ?>>
+                                        <?= View::e($candidate['name']) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -518,6 +525,112 @@ if (!empty($lead['evidence'])) {
             </div>
         </div>
 
+        <?php /* Writing to them directly, as opposed to the drafted cadence
+                 above. Shown for every lead, not only ones already pushed to
+                 GoHighLevel — sending creates the contact if there is not one
+                 yet. Gated on the owner's private integration, because that is
+                 what the mail actually leaves through. */ ?>
+        <div class="card" id="send">
+            <div class="card-head">
+                <h2>Send a message</h2>
+                <?php if ($canSend['ok']): ?>
+                    <span class="dim small">
+                        as <?= View::e($sendAs['name'] ?? 'the owner') ?> · via GoHighLevel
+                    </span>
+                <?php endif; ?>
+            </div>
+            <div class="card-body">
+                <?php if (!$canSend['ok']): ?>
+                    <p class="muted small"><?= View::e($canSend['reason']) ?></p>
+                    <p class="hint">
+                        Mail goes out through the seller's own sub-account, so their replies,
+                        sending domain and unsubscribes all stay in one place.
+                    </p>
+                    <a class="btn btn-sm mt" href="<?= View::e(View::url('ghl/connect', $isAdmin ? ['user_id' => (int) $lead['user_id']] : [])) ?>">
+                        <?php $name = 'link'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                        Connect GoHighLevel
+                    </a>
+
+                <?php elseif (!$canEmail['ok'] && !$canText['ok']): ?>
+                    <p class="muted small"><?= View::e($canEmail['reason']) ?></p>
+                    <p class="hint">No way to reach them yet — dig for contact details and this opens up.</p>
+
+                <?php else: ?>
+                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reply')) ?>"
+                          data-busy="Sending…"
+                          data-confirm="Send this now? It goes straight to them.">
+                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                        <input type="hidden" name="return" value="<?= View::e($leadUrl . '#send') ?>">
+
+                        <div class="field-row">
+                            <div class="field">
+                                <label for="send-channel">Send as</label>
+                                <select id="send-channel" name="channel">
+                                    <?php if ($canEmail['ok']): ?>
+                                        <option value="Email">Email — <?= View::e($lead['email']) ?></option>
+                                    <?php endif; ?>
+                                    <?php if ($canText['ok']): ?>
+                                        <option value="SMS">Text — <?= View::e($lead['direct_phone'] ?: $lead['phone']) ?></option>
+                                    <?php endif; ?>
+                                </select>
+                                <?php if (!$canText['ok']): ?>
+                                    <div class="hint"><?= View::e($canText['reason']) ?></div>
+                                <?php elseif (!$canEmail['ok']): ?>
+                                    <div class="hint"><?= View::e($canEmail['reason']) ?></div>
+                                <?php endif; ?>
+                            </div>
+
+                            <?php if ($canEmail['ok']): ?>
+                                <div class="field">
+                                    <label for="send-subject">Subject</label>
+                                    <input type="text" id="send-subject" name="subject" maxlength="255"
+                                           placeholder="<?= View::e($defaultSubject) ?>">
+                                    <div class="hint">Ignored on a text. Blank sends &ldquo;<?= View::e($defaultSubject) ?>&rdquo;.</div>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="field">
+                            <label for="send-body">Message</label>
+                            <textarea id="send-body" name="body" rows="6" required
+                                      placeholder="Good talking on Tuesday — here is the one-pager I mentioned."></textarea>
+                        </div>
+
+                        <?php if ($signature !== ''): ?>
+                            <p class="hint">Signed off with:</p>
+                            <pre class="sent-body mb"><?= View::e($signature) ?></pre>
+                        <?php else: ?>
+                            <p class="hint">
+                                No sign-off set, so this goes out unsigned.
+                                <a href="<?= View::e(View::url('ghl/connect', $isAdmin ? ['user_id' => (int) $lead['user_id']] : [])) ?>">Add one</a>.
+                            </p>
+                        <?php endif; ?>
+
+                        <?php if ($unverifiedEmail && $canEmail['ok']): ?>
+                            <div class="check mt">
+                                <input type="checkbox" id="send-unverified" name="confirm_unverified" value="1">
+                                <div>
+                                    <label for="send-unverified">Send anyway to an unconfirmed address</label>
+                                    <div class="hint">
+                                        <?= View::e($lead['email']) ?> was inferred from the company's
+                                        format rather than confirmed, so it may bounce.
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="btn-row mt">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <?php $name = 'mail'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
+                                Send now
+                            </button>
+                            <span class="muted small">Goes immediately — there is no draft step here.</span>
+                        </div>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <?php if ($lead['ghl_contact_id'] !== null): ?>
             <div class="card">
                 <div class="card-head">
@@ -535,33 +648,12 @@ if (!empty($lead['evidence'])) {
                         </div>
                     <?php endif; ?>
 
-                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reply')) ?>"
-                          class="mb" data-busy="Sending…"
-                          data-confirm="Send this now? It goes straight to the contact.">
-                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
-                        <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
-                        <div class="field">
-                            <textarea name="body" rows="3" placeholder="Reply…" required></textarea>
-                        </div>
-                        <div class="btn-row">
-                            <select name="channel" aria-label="Send as" style="width:auto">
-                                <option value="Email">Email</option>
-                                <option value="SMS">Text</option>
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-primary">
-                                <?php $name = 'mail'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
-                                Send reply
-                            </button>
-                        </div>
-                    </form>
-
                     <?php if ($thread === []): ?>
                         <p class="muted small">
                             No messages with this contact yet. Anything sent from here or from a
                             cadence shows up in this thread.
                         </p>
                     <?php else: ?>
-                        <hr class="divider">
                         <ul class="thread">
                             <?php foreach ($thread as $message): ?>
                                 <?php

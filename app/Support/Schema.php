@@ -249,6 +249,10 @@ final class Schema
         // catches up on the next request.
         self::addColumns([
             ['users', 'ghl_pipeline_id', 'VARCHAR(120) NULL'],
+            // How this person's outbound email is signed off. Per user rather
+            // than per install: three sellers sharing one sign-off would be
+            // worse than none at all.
+            ['users', 'email_signature', 'TEXT NULL'],
             // A dig runs in the background, so its state has to outlive the
             // request that started it.
             ['leads', 'dig_status', 'VARCHAR(20) NULL'],

@@ -396,10 +396,41 @@ rule that first added it.
 
 ## Conversations
 
+### Emailing somebody directly
+
+**Send a message**, on every lead screen. Write a subject and a body, press send, and it goes —
+there is no draft or approval step, because this is the reply to something they said or the
+follow-up after a call, not a sequence. The cadence in **Outreach** is still the other half of the
+job and is untouched by this.
+
+Three things are worth knowing about it.
+
+**It needs the owner's GoHighLevel private integration**, and says so plainly when there is not one
+rather than hiding. Everything leaves through that seller's own sub-account. Prospector has SMTP
+credentials of its own, but they are for the daily brief — an internal mail to a colleague — and
+putting cold outreach on the same domain reputation as the tool's own notifications would be a bad
+trade. Going through GoHighLevel means the sending domain, the unsubscribe handling and the reply
+routing are the ones already set up for that seller, and the message lands in the contact's
+timeline where their reply will land too.
+
+**The lead does not have to be in GoHighLevel first.** If there is no contact yet, sending creates
+one — the same thing a cadence step does. Being sent off to press another button before you can
+answer somebody is not a safeguard.
+
+**A guessed address asks before it sends.** An address marked `pattern` was inferred from the shape
+of other addresses at the domain and never confirmed; bulk sends refuse it outright, and this asks
+instead, because a deliberate one-off to a person you picked is a different decision. A lead with no
+address and no phone gets an explanation rather than a box.
+
+Each person sets their own sign-off under **GoHighLevel → Connection**, appended to anything sent
+this way. It is per user because three sellers sharing one signature would be worse than none.
+A text never gets one — it would eat the message. Cadence copy writes its own and is left alone.
+
+### The thread
+
 The lead screen shows the real GoHighLevel thread — email and SMS stitched together in one list,
 since GoHighLevel keeps them as separate conversations and the question being asked is "what have we
-said to this person". There is a reply box for both channels; a reply is a person answering
-something, so it is deliberately kept out of the approved cadence rather than disturbing it.
+said to this person". Anything sent from the lead screen or from a cadence appears in it.
 
 The Inbox filters by channel and by unread, and links each conversation back to the lead it belongs
 to instead of being a dead end.
@@ -485,6 +516,7 @@ app/
   LeadImport.php       parse a pasted or uploaded CSV/JSON list
   LeadForm.php         the fields and rules for a lead typed in by hand
   Outreach.php         the cadence spec and the copywriting call
+  Direct.php           one-off email and SMS to a lead, sent on the spot
   LocalModel.php       the OpenAI-compatible client for a local model server
   Automations.php      enrolment rules, the sweep, and who is in what
   Emails.php           email rows, the approve/send state machine, scheduled sends
