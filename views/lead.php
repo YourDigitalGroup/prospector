@@ -648,18 +648,6 @@ if (!empty($lead['evidence'])) {
                             </p>
                         <?php endif; ?>
 
-                        <?php if ($unverifiedEmail): ?>
-                            <div class="check mt">
-                                <input type="checkbox" id="send-unverified" name="confirm_unverified" value="1">
-                                <div>
-                                    <label for="send-unverified">Send anyway to an unconfirmed address</label>
-                                    <div class="hint">
-                                        <?= View::e($lead['email']) ?> was inferred from the company's
-                                        format rather than confirmed, so it may bounce.
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endif; ?>
                     </div>
 
                     <div class="sheet-foot">
