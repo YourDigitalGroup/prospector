@@ -43,7 +43,8 @@ $when = static function (mixed $value): string {
         </span>
     </div>
 
-    <form method="get" action="<?= View::e(View::url('ghl/inbox')) ?>" class="filters">
+    <?php require __DIR__ . '/../partials/filters_toggle.php'; ?>
+    <form method="get" action="<?= View::e(View::url('ghl/inbox')) ?>" class="filters collapsible" id="filters">
         <?php if ($viewingOther): ?>
             <input type="hidden" name="user_id" value="<?= (int) $workspaceUser['id'] ?>">
         <?php endif; ?>

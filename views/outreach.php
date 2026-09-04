@@ -175,7 +175,8 @@ foreach ($rows as $row) {
 </div>
 
 <div class="card">
-    <form method="get" action="<?= View::e(View::url('outreach')) ?>" class="filters">
+    <?php require __DIR__ . '/partials/filters_toggle.php'; ?>
+    <form method="get" action="<?= View::e(View::url('outreach')) ?>" class="filters collapsible" id="filters">
         <div class="field grow">
             <label for="f-q">Search</label>
             <input type="search" id="f-q" name="q" value="<?= View::e($search) ?>"
@@ -266,13 +267,13 @@ foreach ($rows as $row) {
                         <tr>
                             <th class="shrink">
                                 <input type="checkbox" data-check-all aria-label="Select all leads"
-                                       style="width:15px;height:15px;accent-color:var(--accent)">
+                                       class="check-box">
                             </th>
                             <th>Company</th>
                             <th>Sending to</th>
                             <th class="nowrap">Cadence</th>
                             <th class="nowrap">Next</th>
-                            <?php if ($isAdmin): ?><th>Owner</th><?php endif; ?>
+                            <?php if ($isAdmin): ?><th class="secondary">Owner</th><?php endif; ?>
                             <th class="right"></th>
                         </tr>
                     </thead>
@@ -288,7 +289,7 @@ foreach ($rows as $row) {
                                     <?php if ($row['sendable']): ?>
                                         <input type="checkbox" name="ids[]" value="<?= $leadId ?>" data-check-row
                                                aria-label="Select <?= View::e($lead['company']) ?>"
-                                               style="width:15px;height:15px;accent-color:var(--accent)">
+                                               class="check-box">
                                     <?php endif; ?>
                                 </td>
                                 <td>
@@ -341,7 +342,7 @@ foreach ($rows as $row) {
                                     <?php endif; ?>
                                 </td>
                                 <?php if ($isAdmin): ?>
-                                    <td class="nowrap small dim"><?= View::e($lead['owner_name'] ?? '') ?></td>
+                                    <td class="nowrap small dim secondary"><?= View::e($lead['owner_name'] ?? '') ?></td>
                                 <?php endif; ?>
                                 <td class="right nowrap">
                                     <a class="btn btn-sm" href="<?= View::e(View::url('outreach/lead', ['id' => $leadId])) ?>">

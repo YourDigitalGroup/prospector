@@ -77,7 +77,8 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
 </div>
 
 <div class="card">
-    <form method="get" action="<?= View::e(View::url('leads')) ?>" class="filters">
+    <?php require __DIR__ . '/partials/filters_toggle.php'; ?>
+    <form method="get" action="<?= View::e(View::url('leads')) ?>" class="filters collapsible" id="filters">
         <div class="field grow">
             <label for="f-q">Search</label>
             <input type="search" id="f-q" name="q" value="<?= View::e($filters['search'] ?? '') ?>"
@@ -261,16 +262,16 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                     <tr>
                         <th class="shrink">
                             <input type="checkbox" data-check-all aria-label="Select all leads on this page"
-                                   style="width:15px;height:15px;accent-color:var(--accent)">
+                                   class="check-box">
                         </th>
                         <th class="shrink">Fit</th>
                         <th>Company</th>
                         <th>Contact</th>
-                        <th>Market</th>
+                        <th class="secondary">Market</th>
                         <th>Why them</th>
                         <th>Status</th>
-                        <?php if ($isAdmin): ?><th>Owner</th><?php endif; ?>
-                        <th class="right nowrap">Delivered</th>
+                        <?php if ($isAdmin): ?><th class="secondary">Owner</th><?php endif; ?>
+                        <th class="right nowrap secondary">Delivered</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -279,7 +280,7 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                             <td class="shrink">
                                 <input type="checkbox" name="ids[]" value="<?= (int) $lead['id'] ?>" data-check-row
                                        aria-label="Select <?= View::e($lead['company']) ?>"
-                                       style="width:15px;height:15px;accent-color:var(--accent)">
+                                       class="check-box">
                             </td>
                             <td class="shrink"><?php $value = $lead['fit_score']; require __DIR__ . '/partials/score.php'; ?></td>
                             <td>
@@ -324,7 +325,7 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                     </form>
                                 <?php endif; ?>
                             </td>
-                            <td class="nowrap"><?= View::e($lead['market'] ?? '—') ?></td>
+                            <td class="nowrap secondary"><?= View::e($lead['market'] ?? '—') ?></td>
                             <td class="cell-clip small dim"><?= View::e(mb_strimwidth((string) ($lead['why'] ?? ''), 0, 150, '…')) ?></td>
                             <td class="nowrap">
                                 <span class="badge badge-<?= View::e($lead['status']) ?>">
@@ -332,9 +333,9 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                 </span>
                             </td>
                             <?php if ($isAdmin): ?>
-                                <td class="nowrap small dim"><?= View::e($lead['owner_name']) ?></td>
+                                <td class="nowrap small dim secondary"><?= View::e($lead['owner_name']) ?></td>
                             <?php endif; ?>
-                            <td class="right nowrap small muted"><?= View::e(Clock::display((string) $lead['created_at'], 'M j')) ?></td>
+                            <td class="right nowrap small muted secondary"><?= View::e(Clock::display((string) $lead['created_at'], 'M j')) ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
