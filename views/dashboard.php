@@ -27,6 +27,8 @@ foreach ($volume as $point) {
 $today = Clock::today();
 ?>
 
+<?php $showOwners = \Prospector\Auth::isAdmin(); require __DIR__ . '/partials/notices.php'; ?>
+
 <div class="page-head">
     <div>
         <h1>Good morning<?= $currentUser !== null ? ', ' . View::e(explode(' ', (string) $currentUser['name'])[0]) : '' ?></h1>

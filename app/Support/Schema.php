@@ -261,6 +261,11 @@ final class Schema
             // is tested so the compose screen does not have to call the API to
             // say who the mail goes out as.
             ['users', 'ghl_from_email', 'VARCHAR(190) NULL'],
+            // When the owner first opened this lead. Null means nobody has
+            // looked at it yet, which is what the unopened-batch notice counts.
+            // First open rather than last view: "has anyone worked this" is the
+            // question, and a timestamp that keeps moving cannot answer it.
+            ['leads', 'opened_at', 'VARCHAR(25) NULL'],
             // A dig runs in the background, so its state has to outlive the
             // request that started it.
             ['leads', 'dig_status', 'VARCHAR(20) NULL'],

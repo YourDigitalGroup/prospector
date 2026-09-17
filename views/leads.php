@@ -33,6 +33,7 @@ $query = array_filter([
     'owner' => $isAdmin ? ($filters['user_id'] ?? '') : '',
     'archived' => $filters['archived'] ?? '',
     'run_id' => !empty($filters['run_id']) ? $filters['run_id'] : '',
+    'unopened' => !empty($filters['unopened']) ? '1' : '',
 ], static fn ($v): bool => $v !== '' && $v !== null);
 
 // "Clear filters" should only appear when something is actually narrowing the
@@ -45,6 +46,10 @@ $hasFilters = $narrowing !== [];
 
 $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
 ?>
+
+<?php if (empty($filters['unopened'])): ?>
+    <?php $showOwners = $isAdmin; require __DIR__ . '/partials/notices.php'; ?>
+<?php endif; ?>
 
 <div class="page-head">
     <div>
@@ -178,6 +183,14 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                         <?= View::e($label) ?>
                     </option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="f-unopened">Opened</label>
+            <select id="f-unopened" name="unopened" data-autosubmit>
+                <option value="">Any</option>
+                <option value="1" <?= !empty($filters['unopened']) ? 'selected' : '' ?>>Not opened yet</option>
             </select>
         </div>
 
@@ -336,6 +349,9 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                      that break the moment a column is renamed. */ ?>
                             <td class="cell-compact">
                                 <a href="<?= View::e(View::url('leads/' . $lead['id'])) ?>">
+                                    <?php if ($lead['opened_at'] === null): ?>
+                                        <span class="unopened-dot" title="Nobody has opened this yet"></span>
+                                    <?php endif; ?>
                                     <span class="compact-name"><?= View::e($lead['company']) ?></span>
                                     <?php if (!empty($lead['decision_maker'])): ?>
                                         <span class="compact-sub"><?= View::e($lead['decision_maker']) ?></span>
@@ -348,6 +364,9 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
 
                             <td>
                                 <div class="cell-primary">
+                                    <?php if ($lead['opened_at'] === null): ?>
+                                        <span class="unopened-dot" title="Nobody has opened this yet"></span>
+                                    <?php endif; ?>
                                     <a href="<?= View::e(View::url('leads/' . $lead['id'])) ?>"><?= View::e($lead['company']) ?></a>
                                     <?php if ($lead['ghl_contact_id'] !== null): ?>
                                         <span class="badge badge-high" title="In GoHighLevel">GHL</span>

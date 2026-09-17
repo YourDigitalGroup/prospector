@@ -3,6 +3,7 @@
 use Prospector\Auth;
 use Prospector\Emails;
 use Prospector\Leads;
+use Prospector\Notices;
 use Prospector\Support\View;
 use Prospector\Users;
 
@@ -25,6 +26,11 @@ $newLeads = Leads::count(['user_id' => $scopeUserId, 'status' => 'new']);
 // Emails whose day has come and which nobody has sent yet. Worth a badge:
 // an approved cadence that silently stops is the failure mode here.
 $dueEmails = Emails::counts($scopeUserId)['due'];
+
+// Leads nobody has looked at. The count that answers "did a batch land while I
+// was not looking" — the Leads total cannot, because it does not change shape
+// when ten new ones arrive.
+$unopened = Notices::unopenedCount($scopeUserId);
 
 $nav = [
     'Prospect' => [
@@ -145,7 +151,18 @@ $active = static function (string $path) use ($currentPath): bool {
             </form>
 
             <div class="topbar-right">
-                <span class="pill" title="Daily batches are delivered on this schedule">
+                <?php if ($unopened > 0): ?>
+                    <?php /* On every screen, because the point is to be seen from
+                             wherever you happen to be when you open the tool. It
+                             clears itself as the leads get opened, so there is
+                             nothing to dismiss and nothing to click past. */ ?>
+                    <a class="pill pill-alert" href="<?= View::e(View::url('leads', ['unopened' => '1'])) ?>"
+                       title="Leads nobody has opened yet">
+                        <?php $name = 'zap'; $size = 13; require __DIR__ . '/partials/icon.php'; ?>
+                        <?= (int) $unopened ?> unopened
+                    </a>
+                <?php endif; ?>
+                <span class="pill hide-narrow" title="Daily batches are delivered on this schedule">
                     <?php $name = 'clock'; $size = 13; require __DIR__ . '/partials/icon.php'; ?>
                     <?= View::e(\Prospector\Mailer::scheduleDescription()) ?>
                 </span>
