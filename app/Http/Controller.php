@@ -111,6 +111,7 @@ final class Controller
             'volume' => Leads::dailyVolume($scope, 14),
             'runs' => Runs::recent($scope, 5),
             'scheduleText' => Mailer::scheduleDescription(),
+            'digest' => \Prospector\Notices::digest($scope),
         ]);
     }
 
@@ -149,6 +150,7 @@ final class Controller
             'bulkSignatureHtml' => \Prospector\Signature::html(
                 \Prospector\Signature::forUser(self::scopedOwner())
             ),
+            'digest' => \Prospector\Notices::digest(self::scopeUserId()),
         ]);
     }
 
@@ -201,6 +203,10 @@ final class Controller
         if (!Auth::canAccessUser((int) $lead['user_id'])) {
             self::forbidden();
         }
+
+        // Opening a lead is what marks it opened. Only for its owner — see the
+        // note on markOpened.
+        Leads::markOpened($id, Auth::id());
 
         self::renderLead($lead);
     }
@@ -1676,6 +1682,7 @@ final class Controller
             'include_archived' => $archived !== '',
             'archived_only' => $archived === 'only',
             'run_id' => Request::int('run_id'),
+            'unopened' => Request::input('unopened') === '1',
         ];
 
         if (Auth::isAdmin()) {

@@ -133,6 +133,39 @@ either way. See `assets/fonts/README.md`.
 
 ---
 
+## Knowing a batch has landed
+
+A batch lands at half past seven and the brief goes out by email. If that email
+is not read, the ten leads sit there with nothing on any screen saying so — the
+Leads count in the sidebar is a total, and a total does not change shape when
+ten new ones arrive, so it cannot be the thing that tells you.
+
+**The signal is "nobody has opened these", not "this arrived today."** Those
+sound like the same notice and are not. A batch that landed this morning and has
+already been worked through needs no notice; a batch from Monday that nobody
+looked at needs one more than today's does, and gets more urgent as it ages
+rather than less. Keying off opens also means the notice **clears itself by
+being acted on** — there is no dismiss button to click past, and no stored
+"seen" flag that can drift out of step with the work.
+
+Three places it shows up:
+
+- **The topbar**, on every screen: "5 unopened", linking to that filtered list.
+- **A notice** on Home and the leads list, one line per batch — "3 of 3 from
+  this morning", "2 of 2 from Sunday" — each linking to that batch already
+  filtered to its unopened leads. Past two days a batch turns amber, because
+  "yesterday, I was out" and "Monday, still" should not look the same.
+- **A dot** on each unopened row, so the list explains itself.
+
+An admin sees it per owner, because "Billy has ten nobody has touched" is a more
+useful sentence than one number across everybody. **Only the owner opening a
+lead counts**: an admin reading over Billy's shoulder does not mean Billy has
+seen it, and the count exists to say whether the person it was found for has.
+First open is recorded, not last view — the question is "has anyone been here",
+and a timestamp that keeps moving cannot answer it.
+
+---
+
 ## On a phone
 
 The sellers work leads between calls, so the phone is a first-class screen
@@ -694,6 +727,7 @@ app/
   Outreach.php         the cadence spec and the copywriting call
   Direct.php           one-off and bulk email/SMS to leads, sent on the spot
   Merge.php            {{contact.first_name}} and friends, resolved per lead
+  Notices.php          unopened batches, and how to describe them
   Attachment.php       uploaded files, and the URLs GoHighLevel fetches them by
   Signature.php        the per-user sign-off, its logo upload and its HTML
   LocalModel.php       the OpenAI-compatible client for a local model server

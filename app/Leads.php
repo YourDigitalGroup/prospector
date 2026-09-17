@@ -286,6 +286,13 @@ final class Leads
             $params['search'] = '%' . str_replace(['%', '_'], ['\%', '\_'], (string) $filters['search']) . '%';
         }
 
+        // Leads nobody has opened yet. The notice on the dashboard links
+        // straight here, so the filter has to exist for the link to land
+        // somewhere useful rather than on an unfiltered list.
+        if (!empty($filters['unopened'])) {
+            $where[] = 'l.opened_at IS NULL';
+        }
+
         if (!empty($filters['archived_only'])) {
             $where[] = 'l.archived_at IS NOT NULL';
         } elseif (empty($filters['include_archived'])) {
@@ -692,6 +699,23 @@ final class Leads
             $was === ''
                 ? 'Address set to ' . $email
                 : 'Address corrected from ' . $was . ' to ' . $email
+        );
+    }
+
+    /**
+     * Note that the owner has looked at this lead.
+     *
+     * Only the owner: an admin reading over Billy's shoulder does not mean
+     * Billy has worked it, and the whole point of the count is to say whether
+     * the person it was found for has seen it. Set once and left alone — the
+     * question is "has anyone been here", not "when were they last".
+     */
+    public static function markOpened(int $leadId, int $viewerId): void
+    {
+        Database::run(
+            'UPDATE leads SET opened_at = :now
+             WHERE id = :id AND user_id = :viewer AND opened_at IS NULL',
+            ['now' => Clock::now(), 'id' => $leadId, 'viewer' => $viewerId]
         );
     }
 

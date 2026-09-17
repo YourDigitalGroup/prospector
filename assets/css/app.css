@@ -825,6 +825,68 @@ fieldset { border: 0; margin: 0; padding: 0; }
     .topbar { padding: 10px 14px; }
 }
 
+/* --------------------------------------------------------------- notices
+   The unopened-batch notice. Accented rather than warning-coloured: a batch
+   waiting is an opportunity, not a problem. It turns amber only once something
+   has been sitting two days, which is the point at which it has stopped being
+   "I was out yesterday". */
+
+.notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    background: var(--surface);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: 0 0 26px -18px var(--accent-glow);
+}
+
+.notice.is-stale {
+    border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+    border-left-color: var(--warning);
+    box-shadow: none;
+}
+
+.notice-mark { color: var(--accent); flex: 0 0 auto; padding-top: 1px; }
+.notice.is-stale .notice-mark { color: var(--warning); }
+
+.notice-body { flex: 1 1 auto; min-width: 0; font-size: 13.5px; }
+.notice-body strong { display: block; color: var(--text); font-weight: 650; }
+
+.notice-list {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 3px;
+    font-size: 13px;
+}
+.notice-list li { display: flex; align-items: center; gap: 7px; }
+
+.notice-go { flex: 0 0 auto; }
+
+/* A lead nobody has opened. Small enough to be a mark rather than a shout, and
+   it goes the moment the lead is opened. */
+.unopened-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex: 0 0 auto;
+}
+
+/* The topbar chip that carries the count. */
+.pill-alert {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+    font-weight: 650;
+}
+.pill-alert:hover { text-decoration: none; background: var(--surface-3); }
+
 /* ------------------------------------------------------- action colours
    Three buttons that say what they do by colour as well as by label, picked by
    the owner. They carry their own ink rather than inheriting --accent-ink,
@@ -1174,6 +1236,13 @@ dialog.sheet.sheet-sm { width: min(420px, calc(100% - 32px)); }
 
     /* The company name is the card's tap target, so give it a real one. */
     table.data:not(.compact) .cell-primary a { display: inline-flex; align-items: center; min-height: 44px; }
+
+    /* The schedule pill is the least load-bearing thing in the topbar, and
+       with the unopened count beside it the row no longer fits. */
+    .hide-narrow { display: none; }
+
+    .notice { flex-wrap: wrap; }
+    .notice-go { width: 100%; justify-content: center; }
 
     /* ---- lists marked .compact get one line per row ------------------
        The card layout was right for a table that had to be readable at all,
