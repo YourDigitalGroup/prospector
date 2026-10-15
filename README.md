@@ -333,6 +333,33 @@ Nothing is stored until the preview is confirmed. Three deliberate choices there
 - **De-duplication is per owner**, so re-uploading the same list is safe, and the same company can
   legitimately sit with both Billy and Darren.
 
+### Re-uploading a list to update what is on file
+
+A list usually arrives twice: once thin, once with the addresses and titles filled in. **How to
+handle people already on file** on the upload form decides what the second one does.
+
+- **Update them with whatever the file says** (the default) — the file wins on any column it
+  actually carries.
+- **Only fill in blanks** — the file supplies what is missing and never contradicts what is there.
+- **Leave them alone** — matched rows are skipped, which is how uploads behaved before.
+
+Two rules hold in every mode. **A blank cell is not a value**: a column the file leaves empty never
+wipes what is on file, so a list exported without phone numbers cannot delete your phone numbers.
+And **an upload only owns the research fields** — the ones listed above. Status, your notes, the
+GoHighLevel link, whether the batch has been opened and the day the lead arrived are never touched
+by a file, so a lead you have moved to *Meeting booked* with a note on it stays that way while its
+contact details get corrected underneath.
+
+Matching is on company plus person, and it works in both directions: a row that has since gained an
+email still finds the name-only lead it belongs to, rather than filing a second copy of the same
+person. Someone genuinely new at a company already on file is still new.
+
+The preview says which it is for every row — **New**, **Update** naming the fields that would move,
+or **No change** — and a changed cell shows the value it would replace, struck through, underneath.
+The confirm button reads "Add 3 and update 12", so the count is seen before anything is written.
+Each change is also written to that lead's timeline, naming the field and the old value, so an
+upload that corrects something is auditable after the fact.
+
 ### Digging for missing contact details
 
 A lead that arrives without an email or phone gets a **Dig for contact details** button, on the
@@ -744,6 +771,7 @@ assets/                stylesheet, script, the logo, the Hellforge wordmark face
 bin/daily.php          CLI runner for cron
 bin/serve.php          local dev server router
 bin/favicons.php       rebuild the tab icons from assets/img/logo.png
+tests/                 checks you can run locally; mock servers for Anthropic and GoHighLevel
 worker/                the external worker — runs on your Mac, talks to local Ollama
 storage/               database, encryption key, logs (never served, never committed)
 ```
@@ -759,3 +787,14 @@ themselves are unaffected.
 composer install
 php -S 127.0.0.1:8000 -t . bin/serve.php
 ```
+
+### Checks
+
+```bash
+php tests/import_update.php     # re-upload matching and change rules, no server needed
+php tests/import_screen.php     # the import screen, driven over HTTP
+```
+
+Both are local-only: they sign in with the seeded dev account and write leads, and they refuse to
+run against a database holding more than a couple of hundred of them. `tests/import_screen.php`
+needs the dev server up, and takes `PROSPECTOR_TEST_URL` if it is not on port 8099.

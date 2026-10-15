@@ -16,7 +16,14 @@ use Prospector\Support\View;
  * @var int $targetUserId
  * @var bool $sendEmail
  * @var list<string> $fields
+ * @var string $mode
+ * @var array<string, string> $modes
+ * @var array{rows: list<array<string, mixed>>, new: int, updated: int, unchanged: int, fields: int}|null $preview
  */
+
+// Keyed by row position, so the table can ask what each row would do as it
+// walks the parsed rows.
+$verdicts = $preview['rows'] ?? [];
 
 $hasPreview = $rows !== [] || $problems !== [];
 
@@ -71,6 +78,27 @@ $show = array_values(array_filter($preferred, static function (string $field) us
                         <div class="hint">De-duplication is per owner, so the same company can sit with both Billy and Darren.</div>
                     </div>
                 <?php endif; ?>
+
+                <?php /* The question an upload has to answer now that a row can
+                         change a record as well as add one. Default is to take
+                         the file's word for it, because the reason to re-upload
+                         a list is almost always that it now knows more than we
+                         do. */ ?>
+                <div class="field">
+                    <label for="mode">If a lead is already on file</label>
+                    <select id="mode" name="mode">
+                        <?php foreach ($modes as $key => $label): ?>
+                            <option value="<?= View::e($key) ?>" <?= $mode === $key ? 'selected' : '' ?>>
+                                <?= View::e($label) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="hint">
+                        An empty column never overwrites anything, whichever you pick — a file
+                        exported without the phone column will not wipe every phone number.
+                        Status, notes and the GoHighLevel link are never touched.
+                    </div>
+                </div>
 
                 <div class="field">
                     <label for="file">CSV or JSON file</label>
@@ -142,8 +170,14 @@ $show = array_values(array_filter($preferred, static function (string $field) us
                     same person at the same company, matched on the email address when there is one
                     and on the name when there is not — so a marketing director and a GM at the same
                     hospital are two leads, not a rejected row.</li>
-                <li><strong>People already on file for that owner are skipped</strong>, so re-uploading
-                    the same list is safe.</li>
+                <li><strong>A lead already on file is updated, not duplicated.</strong> Re-upload a
+                    list once the addresses have been found and the addresses land on the leads
+                    you already have. Matching is on the person at the company — by email when
+                    there is one, and by name when the email has only just turned up, so a row
+                    that gained an address still finds its own lead rather than making a second
+                    one.</li>
+                <li><strong>Nothing is written until the preview is confirmed</strong>, and the
+                    preview names every field each row would change.</li>
             </ul>
         </div>
     </div>
@@ -154,7 +188,18 @@ $show = array_values(array_filter($preferred, static function (string $field) us
         <div class="card-head">
             <h2>Preview</h2>
             <span class="dim small">
-                <?= count($rows) ?> ready<?= $problems !== [] ? ' · ' . count($problems) . ' to look at' : '' ?>
+                <?php if ($preview !== null): ?>
+                    <?= (int) $preview['new'] ?> new
+                    <?php if ($preview['updated'] > 0): ?>
+                        · <?= (int) $preview['updated'] ?> to update
+                    <?php endif; ?>
+                    <?php if ($preview['unchanged'] > 0): ?>
+                        · <?= (int) $preview['unchanged'] ?> unchanged
+                    <?php endif; ?>
+                <?php else: ?>
+                    <?= count($rows) ?> ready
+                <?php endif; ?>
+                <?= $problems !== [] ? ' · ' . count($problems) . ' to look at' : '' ?>
             </span>
         </div>
 
@@ -189,6 +234,7 @@ $show = array_values(array_filter($preferred, static function (string $field) us
                 <table class="data">
                     <thead>
                         <tr>
+                            <th class="nowrap">Lands as</th>
                             <?php foreach ($show as $field): ?>
                                 <th<?= $field === 'fit_score' ? ' class="nowrap"' : '' ?>>
                                     <?= View::e(str_replace('_', ' ', $field)) ?>
@@ -197,17 +243,74 @@ $show = array_values(array_filter($preferred, static function (string $field) us
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach (array_slice($rows, 0, 50) as $row): ?>
-                            <tr>
+                        <?php foreach (array_slice($rows, 0, 50, true) as $index => $row): ?>
+                            <?php
+                            $entry = $verdicts[$index] ?? null;
+                            $verdict = $entry['verdict'] ?? 'new';
+                            $changes = $entry['changes'] ?? [];
+                            $existing = $entry['existing'] ?? null;
+
+                            /*
+                             * What the lead will hold once this row has landed,
+                             * which is not always what the row says. A file with
+                             * an empty score column leaves the score alone, and
+                             * printing the file's blank — a bare 0 — next to a
+                             * lead scored 70 reads like the upload is about to
+                             * wipe it. The preview is a promise about the
+                             * result, so it shows the result.
+                             */
+                            $after = static function (string $field) use ($row, $changes, $existing): string {
+                                if (isset($changes[$field])) {
+                                    return (string) $changes[$field]['to'];
+                                }
+
+                                $incoming = trim((string) ($row[$field] ?? ''));
+
+                                if ($existing === null) {
+                                    return $incoming;
+                                }
+
+                                // Unchanged, so whatever is on file is what it
+                                // will still be — blank incoming cell or not.
+                                return trim((string) ($existing[$field] ?? ''));
+                            };
+                            ?>
+                            <tr class="<?= $verdict === 'unchanged' ? 'row-muted' : '' ?>">
+                                <td class="nowrap">
+                                    <?php if ($verdict === 'new'): ?>
+                                        <span class="badge badge-new">New</span>
+                                    <?php elseif ($verdict === 'updated'): ?>
+                                        <span class="badge badge-high">Update</span>
+                                        <div class="cell-sub">
+                                            <?php /* Named rather than counted: "3 fields" tells
+                                                     you nothing about whether you want it. */ ?>
+                                            <?= View::e(implode(', ', array_map(
+                                                static fn (string $f): string => str_replace('_', ' ', $f),
+                                                array_keys($changes)
+                                            ))) ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="badge badge-neutral">No change</span>
+                                    <?php endif; ?>
+                                </td>
                                 <?php foreach ($show as $field): ?>
-                                    <td class="<?= $field === 'company' ? 'cell-primary' : 'cell-clip' ?>">
-                                        <?php if ($field === 'email' && ($row['email'] ?? '') !== ''): ?>
-                                            <?= View::e($row['email']) ?>
-                                            <span class="badge badge-<?= View::e($row['email_confidence'] ?? 'pattern') ?>">
-                                                <?= View::e($row['email_confidence'] ?? 'pattern') ?>
+                                    <?php
+                                    $change = $changes[$field] ?? null;
+                                    $value = $after($field);
+                                    ?>
+                                    <td class="<?= $field === 'company' ? 'cell-primary' : 'cell-clip' ?><?= $change !== null ? ' is-changing' : '' ?>">
+                                        <?php if ($field === 'email' && $value !== ''): ?>
+                                            <?php $confidence = $after('email_confidence') ?: 'pattern'; ?>
+                                            <?= View::e($value) ?>
+                                            <span class="badge badge-<?= View::e($confidence) ?>">
+                                                <?= View::e($confidence) ?>
                                             </span>
                                         <?php else: ?>
-                                            <?= View::e($row[$field] ?? '') ?>
+                                            <?= View::e($value) ?>
+                                        <?php endif; ?>
+
+                                        <?php if ($change !== null && $change['from'] !== ''): ?>
+                                            <div class="cell-sub was">was <?= View::e(mb_strimwidth($change['from'], 0, 40, '…')) ?></div>
                                         <?php endif; ?>
                                     </td>
                                 <?php endforeach; ?>
@@ -229,9 +332,17 @@ $show = array_values(array_filter($preferred, static function (string $field) us
                     <?php if ($sendEmail): ?>
                         <input type="hidden" name="send_email" value="1">
                     <?php endif; ?>
+                    <input type="hidden" name="mode" value="<?= View::e($mode) ?>">
                     <input type="hidden" name="parsed" value="<?= View::e(json_encode($rows, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?>">
                     <button class="btn btn-primary" type="submit">
-                        Import <?= count($rows) ?> lead<?= count($rows) === 1 ? '' : 's' ?>
+                        <?php if ($preview !== null && $preview['updated'] > 0 && $preview['new'] > 0): ?>
+                            Add <?= (int) $preview['new'] ?> and update <?= (int) $preview['updated'] ?>
+                        <?php elseif ($preview !== null && $preview['updated'] > 0): ?>
+                            Update <?= (int) $preview['updated'] ?> lead<?= $preview['updated'] === 1 ? '' : 's' ?>
+                        <?php else: ?>
+                            Import <?= $preview !== null ? (int) $preview['new'] : count($rows) ?>
+                            lead<?= ($preview !== null ? $preview['new'] : count($rows)) === 1 ? '' : 's' ?>
+                        <?php endif; ?>
                     </button>
                 </form>
             </div>

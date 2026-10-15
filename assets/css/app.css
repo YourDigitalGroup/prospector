@@ -825,6 +825,15 @@ fieldset { border: 0; margin: 0; padding: 0; }
     .topbar { padding: 10px 14px; }
 }
 
+/* --------------------------------------------- the import preview
+   A cell about to change is marked, and what it is changing from sits under
+   it. Confirming an upload that rewrites forty records should be a decision
+   somebody makes with the before and after in front of them. */
+
+td.is-changing { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.cell-sub.was { color: var(--muted); text-decoration: line-through; }
+tr.row-muted { opacity: .55; }
+
 /* --------------------------------------------------------------- notices
    The unopened-batch notice. Accented rather than warning-coloured: a batch
    waiting is an opportunity, not a problem. It turns amber only once something
