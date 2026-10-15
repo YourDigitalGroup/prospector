@@ -101,6 +101,271 @@ final class Leads
     }
 
     /**
+     * What an upload may change on a lead it matches.
+     *
+     * Facts about the company and the person, and nothing else. Deliberately
+     * absent: status, owner_note, the activity timeline, ghl_contact_id,
+     * opened_at, archived_at, created_at and run_id. A spreadsheet should never
+     * be able to move a lead you marked Signed back to New, unpick it from its
+     * CRM contact, or make a batch you have already worked look unopened again.
+     *
+     * @return list<string>
+     */
+    public static function updatableFields(): array
+    {
+        return [
+            'website', 'vertical', 'door', 'market', 'state',
+            'decision_maker', 'title', 'email', 'email_confidence',
+            'phone', 'direct_phone', 'linkedin', 'fit_score', 'why', 'hook', 'evidence',
+        ];
+    }
+
+    /**
+     * The lead an uploaded row is about, if this owner already has one.
+     *
+     * Two passes, because the identity key moves. contact_key is the email when
+     * there is one and the person's name when there is not, so a lead stored
+     * with a name and no address gets a *different* key once the address turns
+     * up — and the single most common reason to re-upload a list is that the
+     * addresses have since been found. Matching on the key alone would file
+     * that row as a new person and leave two of them.
+     *
+     * So: the exact key first, then the same named person at the same company
+     * whatever their key says. Two different people with the same name at one
+     * company would collide, which is rare enough to accept and visible in the
+     * preview before anything is written.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>|null
+     */
+    public static function matchFor(int $userId, array $row): ?array
+    {
+        $company = trim((string) ($row['company'] ?? ''));
+
+        if ($company === '') {
+            return null;
+        }
+
+        $key = self::companyKey($company);
+
+        $exact = Database::first(
+            'SELECT * FROM leads WHERE user_id = :uid AND company_key = :key AND contact_key = :contact',
+            ['uid' => $userId, 'key' => $key, 'contact' => self::contactKey($row)]
+        );
+
+        if ($exact !== null) {
+            return $exact;
+        }
+
+        $person = self::personKey((string) ($row['decision_maker'] ?? ''));
+
+        if ($person === '') {
+            return null;
+        }
+
+        // LOWER() in SQL rather than a stored column: this is one query on an
+        // import, not a hot path, and another denormalised key is another thing
+        // that can fall out of step.
+        return Database::first(
+            "SELECT * FROM leads
+             WHERE user_id = :uid AND company_key = :key
+               AND decision_maker IS NOT NULL
+               AND LOWER(TRIM(decision_maker)) = :person
+             ORDER BY id ASC LIMIT 1",
+            ['uid' => $userId, 'key' => $key, 'person' => $person]
+        );
+    }
+
+    private static function personKey(string $name): string
+    {
+        return strtolower(trim($name));
+    }
+
+    /**
+     * What an uploaded row would change on a lead already on file.
+     *
+     * The rule that matters: **a blank cell is not a value.** An empty column
+     * never overwrites anything, in any mode. A spreadsheet exported without
+     * the phone column should not wipe every phone number on file, and that is
+     * exactly what "overwrite" would mean if taken literally. Clearing a field
+     * stays a thing you do on the lead itself, deliberately, to one record.
+     *
+     * @param array<string, mixed> $existing
+     * @param array<string, mixed> $row
+     * @param string $mode 'fill' touches only empty fields; 'update' takes the
+     *                     file's value wherever it supplies one
+     * @return array<string, array{from: string, to: string}>
+     */
+    public static function changesFor(array $existing, array $row, string $mode): array
+    {
+        if ($mode !== 'fill' && $mode !== 'update') {
+            return [];
+        }
+
+        $changes = [];
+
+        foreach (self::updatableFields() as $field) {
+            $incoming = self::incomingValue($field, $row);
+
+            if ($incoming === null) {
+                continue;
+            }
+
+            $current = self::currentValue($field, $existing);
+
+            if ($current === $incoming) {
+                continue;
+            }
+
+            // Fill mode defers to whatever is already there; update mode does
+            // not. Both leave a field the file said nothing about alone.
+            if ($mode === 'fill' && $current !== '') {
+                continue;
+            }
+
+            $changes[$field] = ['from' => $current, 'to' => $incoming];
+        }
+
+        return $changes;
+    }
+
+    /**
+     * The file's value for a field, or null when it did not supply one.
+     *
+     * @param array<string, mixed> $row
+     */
+    private static function incomingValue(string $field, array $row): ?string
+    {
+        if ($field === 'evidence') {
+            $value = $row['evidence'] ?? null;
+            if (is_array($value)) {
+                $value = implode(', ', array_map('strval', $value));
+            }
+            $value = trim((string) $value);
+
+            return $value === '' ? null : $value;
+        }
+
+        if ($field === 'fit_score') {
+            // Unscored is stored as 0, so a blank column and a deliberate zero
+            // are indistinguishable by the time they get here. Treating 0 as
+            // "nothing said" is the safe reading: it cannot wipe a real score,
+            // and nobody uploads a list to set everything to zero.
+            $score = (int) ($row['fit_score'] ?? 0);
+
+            return $score > 0 ? (string) $score : null;
+        }
+
+        $value = trim((string) ($row[$field] ?? ''));
+
+        return $value === '' ? null : $value;
+    }
+
+    /** @param array<string, mixed> $existing */
+    private static function currentValue(string $field, array $existing): string
+    {
+        if ($field === 'evidence') {
+            $decoded = json_decode((string) ($existing['evidence'] ?? ''), true);
+
+            if (is_array($decoded)) {
+                return implode(', ', array_map('strval', $decoded));
+            }
+
+            return is_string($decoded) ? $decoded : trim((string) ($existing['evidence'] ?? ''));
+        }
+
+        if ($field === 'fit_score') {
+            $score = (int) ($existing['fit_score'] ?? 0);
+
+            return $score > 0 ? (string) $score : '';
+        }
+
+        return trim((string) ($existing[$field] ?? ''));
+    }
+
+    /**
+     * Apply what changesFor worked out, and say so on the timeline.
+     *
+     * @param array<string, array{from: string, to: string}> $changes
+     * @return int how many fields actually moved
+     */
+    public static function applyChanges(int $leadId, array $changes, ?int $actorId = null, string $source = 'an uploaded list'): int
+    {
+        if ($changes === []) {
+            return 0;
+        }
+
+        $lead = self::find($leadId);
+
+        if ($lead === null) {
+            return 0;
+        }
+
+        $update = ['updated_at' => Clock::now()];
+
+        foreach ($changes as $field => $change) {
+            $value = $change['to'];
+
+            if ($field === 'fit_score') {
+                $update[$field] = max(0, min(100, (int) $value));
+                continue;
+            }
+
+            if ($field === 'evidence') {
+                $update[$field] = json_encode($value, JSON_UNESCAPED_SLASHES);
+                continue;
+            }
+
+            $update[$field] = self::clean($value, self::lengthFor($field));
+        }
+
+        // The email and the name are what contact_key is derived from, so a
+        // change to either has to move the key with it or de-duplication starts
+        // matching on something the lead no longer says.
+        if (isset($changes['email']) || isset($changes['decision_maker'])) {
+            $update['contact_key'] = self::contactKey(array_merge($lead, [
+                'email' => $changes['email']['to'] ?? $lead['email'],
+                'decision_maker' => $changes['decision_maker']['to'] ?? $lead['decision_maker'],
+            ]));
+        }
+
+        Database::update('leads', $update, ['id' => $leadId]);
+
+        $described = [];
+        foreach ($changes as $field => $change) {
+            $label = str_replace('_', ' ', $field);
+            $described[] = $change['from'] === ''
+                ? $label . ' set to ' . mb_strimwidth($change['to'], 0, 60, '…')
+                : $label . ': ' . mb_strimwidth($change['from'], 0, 30, '…')
+                    . ' → ' . mb_strimwidth($change['to'], 0, 40, '…');
+        }
+
+        self::addActivity(
+            $leadId,
+            $actorId,
+            'note',
+            'Updated from ' . $source . ' — ' . implode('; ', $described)
+        );
+
+        return count($changes);
+    }
+
+    /** Column widths, so an update truncates the same way an insert does. */
+    private static function lengthFor(string $field): int
+    {
+        return match ($field) {
+            'website', 'linkedin' => 255,
+            'vertical', 'door' => 80,
+            'market' => 120,
+            'state' => 40,
+            'email_confidence' => 20,
+            'phone', 'direct_phone' => 60,
+            'why', 'hook' => 2000,
+            default => 190,
+        };
+    }
+
+    /**
      * Insert a lead unless this owner already has that person at that company.
      *
      * @param array<string, mixed> $lead

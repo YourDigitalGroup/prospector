@@ -919,6 +919,9 @@ final class Controller
                 'targetUserId' => Auth::id(),
                 'sendEmail' => false,
                 'fields' => LeadImport::fields(),
+                'mode' => 'update',
+                'modes' => self::importModes(),
+                'preview' => null,
             ], $extra));
         };
 
@@ -932,6 +935,7 @@ final class Controller
 
         $target = self::importTarget();
         $sendEmail = Request::bool('send_email');
+        $mode = self::importMode();
 
         // Second pass: the rows have already been parsed and shown, and the
         // hidden field carries exactly what the preview displayed.
@@ -945,13 +949,11 @@ final class Controller
                 self::redirect('/leads/import');
             }
 
-            $result = self::storeImported($target, $rows, $sendEmail);
+            $result = self::storeImported($target, $rows, $sendEmail, $mode);
+            $landed = $result['stored'] + $result['updated'];
 
-            self::flash(
-                $result['stored'] > 0 ? 'success' : 'error',
-                $result['message']
-            );
-            self::redirect($result['stored'] > 0 ? '/leads' : '/leads/import');
+            self::flash($landed > 0 ? 'success' : 'error', $result['message']);
+            self::redirect($landed > 0 ? '/leads' : '/leads/import');
         }
 
         // First pass: read the file if one came, otherwise the pasted box.
@@ -981,6 +983,10 @@ final class Controller
             'problems' => $parsed['problems'],
             'columns' => $parsed['columns'],
             'ignored' => $parsed['ignored'],
+            'mode' => $mode,
+            // What each row would actually do, worked out against what is
+            // already on file. Nothing is written until this has been seen.
+            'preview' => self::previewImport($target, $parsed['rows'], $mode),
             // Only echo back what was typed. Replaying an uploaded file into the
             // textarea would be unreadable for anything but a tiny list.
             'raw' => $fromFile ? '' : $raw,
@@ -1020,7 +1026,86 @@ final class Controller
      * @param list<mixed>          $rows
      * @return array{stored: int, skipped: int, message: string}
      */
-    private static function storeImported(array $user, array $rows, bool $sendEmail): array
+    /**
+     * The three things an upload can do with a row that is already on file.
+     *
+     * @return array<string, string>
+     */
+    public static function importModes(): array
+    {
+        return [
+            'update' => 'Update them with whatever the file says',
+            'fill' => 'Only fill in blanks, keep what is already there',
+            'skip' => 'Leave them alone',
+        ];
+    }
+
+    private static function importMode(): string
+    {
+        $mode = Request::input('mode', 'update');
+
+        return array_key_exists($mode, self::importModes()) ? $mode : 'update';
+    }
+
+    /**
+     * Work out, before anything is written, what each row would actually do.
+     *
+     * The whole point of this screen is that nothing lands unseen, and that
+     * matters far more now that a row can change a record rather than only
+     * adding one. An upload that silently rewrote forty leads would be a bad
+     * afternoon; an upload that shows "12 new, 23 updated, 5 unchanged" and
+     * names the fields it would touch is a decision somebody can make.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return array{rows: list<array<string, mixed>>, new: int, updated: int, unchanged: int, fields: int}
+     */
+    private static function previewImport(array $user, array $rows, string $mode): array
+    {
+        $userId = (int) $user['id'];
+        $out = [];
+        $new = 0;
+        $updated = 0;
+        $unchanged = 0;
+        $fields = 0;
+
+        // Keyed by the row's own position, never appended: the table reads
+        // these back by index, and a verdict sitting beside the wrong row is
+        // worse than no verdict at all.
+        foreach ($rows as $index => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $existing = Leads::matchFor($userId, $row);
+
+            if ($existing === null) {
+                $new++;
+                $out[$index] = ['row' => $row, 'verdict' => 'new', 'existing' => null, 'changes' => []];
+                continue;
+            }
+
+            $changes = Leads::changesFor($existing, $row, $mode);
+
+            if ($changes === []) {
+                $unchanged++;
+                $out[$index] = ['row' => $row, 'verdict' => 'unchanged', 'existing' => $existing, 'changes' => []];
+                continue;
+            }
+
+            $updated++;
+            $fields += count($changes);
+            $out[$index] = ['row' => $row, 'verdict' => 'updated', 'existing' => $existing, 'changes' => $changes];
+        }
+
+        return ['rows' => $out, 'new' => $new, 'updated' => $updated, 'unchanged' => $unchanged, 'fields' => $fields];
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     * @param list<mixed>          $rows
+     * @return array{stored: int, updated: int, skipped: int, message: string}
+     */
+    private static function storeImported(array $user, array $rows, bool $sendEmail, string $mode): array
     {
         // An upload still gets a run row to hang the leads off, and a user
         // with no loop can still be uploaded to.
@@ -1039,7 +1124,11 @@ final class Controller
             'upload'
         );
 
+        $userId = (int) $user['id'];
+        $actorId = Auth::id();
         $stored = 0;
+        $updated = 0;
+        $fields = 0;
         $skipped = 0;
 
         foreach ($rows as $row) {
@@ -1048,24 +1137,44 @@ final class Controller
                 continue;
             }
 
-            $id = Leads::create((int) $user['id'], $runId, $row);
+            // Matched first, so the decision about an existing lead is made
+            // once and the same way the preview made it.
+            $existing = Leads::matchFor($userId, $row);
+
+            if ($existing !== null) {
+                $changes = Leads::changesFor($existing, $row, $mode);
+
+                if ($changes === []) {
+                    $skipped++;
+                    continue;
+                }
+
+                $fields += Leads::applyChanges((int) $existing['id'], $changes, $actorId);
+                $updated++;
+                continue;
+            }
+
+            $id = Leads::create($userId, $runId, $row);
 
             if ($id > 0) {
                 $stored++;
-                Leads::addActivity($id, Auth::id(), 'created', 'Added from an uploaded list');
+                Leads::addActivity($id, $actorId, 'created', 'Added from an uploaded list');
             } else {
-                // Already on file for this owner — de-duplication is the point.
+                // matchFor missed it but create still refused — the in-file
+                // key collided with something matchFor does not reach. Counted
+                // rather than silently dropped.
                 $skipped++;
             }
         }
 
         $brief = "## Uploaded list\n\n"
             . '- Imported by: ' . (string) (Auth::user()['name'] ?? 'unknown') . "\n"
-            . '- Stored: ' . $stored . "\n"
-            . '- Skipped as already on file: ' . $skipped . "\n";
+            . '- Added: ' . $stored . "\n"
+            . '- Updated: ' . $updated . ' (' . $fields . " fields)\n"
+            . '- Left alone: ' . $skipped . "\n";
 
         Runs::finish($runId, [
-            'status' => $stored > 0 ? 'success' : 'partial',
+            'status' => ($stored + $updated) > 0 ? 'success' : 'partial',
             'lead_count' => $stored,
             'brief_md' => $brief,
         ]);
@@ -1084,18 +1193,26 @@ final class Controller
             }
         }
 
-        $message = $stored === 0
-            ? 'Nothing new was imported — all ' . $skipped . ' were already on file for ' . (string) $user['name'] . '.'
-            : sprintf(
-                'Imported %d lead%s for %s.%s%s',
-                $stored,
-                $stored === 1 ? '' : 's',
-                (string) $user['name'],
-                $skipped > 0 ? ' ' . $skipped . ' skipped as already on file.' : '',
-                $emailNote
-            );
+        $parts = [];
+        if ($stored > 0) {
+            $parts[] = 'Added ' . $stored . ' ' . ($stored === 1 ? 'lead' : 'leads');
+        }
+        if ($updated > 0) {
+            $parts[] = 'updated ' . $updated . ' ' . ($updated === 1 ? 'lead' : 'leads')
+                . ' (' . $fields . ' ' . ($fields === 1 ? 'field' : 'fields') . ')';
+        }
 
-        return ['stored' => $stored, 'skipped' => $skipped, 'message' => $message];
+        if ($parts === []) {
+            $message = $mode === 'skip'
+                ? 'Nothing changed — all ' . $skipped . ' were already on file for ' . (string) $user['name'] . '.'
+                : 'Nothing changed — all ' . $skipped . ' were already on file and the file had nothing new to add.';
+        } else {
+            $message = ucfirst(implode(', ', $parts)) . ' for ' . (string) $user['name'] . '.'
+                . ($skipped > 0 ? ' ' . $skipped . ' left alone.' : '')
+                . $emailNote;
+        }
+
+        return ['stored' => $stored, 'updated' => $updated, 'skipped' => $skipped, 'message' => $message];
     }
 
     public static function leadsExport(): void
