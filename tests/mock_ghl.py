@@ -303,6 +303,11 @@ class Handler(BaseHTTPRequestHandler):
                 contact = {
                     "id": f"c{len(STATE['contacts']) + 1}",
                     "contactName": payload.get("name", ""),
+                    # Kept rather than dropped: the app splits a stored name
+                    # into these two before sending, and a mock that throws
+                    # them away cannot catch it splitting them wrongly.
+                    "firstName": payload.get("firstName", ""),
+                    "lastName": payload.get("lastName", ""),
                     "companyName": payload.get("companyName", ""),
                     "email": payload.get("email", ""),
                     "phone": payload.get("phone", ""),

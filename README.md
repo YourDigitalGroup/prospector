@@ -360,6 +360,32 @@ The confirm button reads "Add 3 and update 12", so the count is seen before anyt
 Each change is also written to that lead's timeline, naming the field and the old value, so an
 upload that corrects something is auditable after the fact.
 
+### Exporting the list
+
+**Leads → Export** hands back whatever the current filters are showing, as a CSV, up to 5,000 rows.
+
+A lead stores one `decision_maker` field, because that is how a name arrives — from a batch, a
+spreadsheet or a business card, always as one string. The export also carries **First name** and
+**Last name** beside it, worked out from that one field, since a mail merge or a CRM import wants
+the parts. The whole name is still there and unchanged, so nothing that read the old file breaks.
+
+The split is one function, used in three places that would otherwise drift: the export columns,
+the `{{contact.first_name}}` merge variables, and the first and last name sent when a lead is
+pushed to GoHighLevel. It drops a leading honorific and trailing credentials, and reads a
+surname-first listing the right way round:
+
+| Stored name | First | Last |
+|---|---|---|
+| `Dana Whitfield` | Dana | Whitfield |
+| `Dr. Yolanda Achebe` | Yolanda | Achebe |
+| `Cale Slack, DDS` | Cale | Slack |
+| `Slack, Cale` | Cale | Slack |
+| `Marcus van der Berg` | Marcus | van der Berg |
+| `Madonna` | Madonna | |
+
+`Sr.` is deliberately not treated as an honorific — it is a suffix at least as often, and guessing
+wrong costs more than leaving it alone.
+
 ### Digging for missing contact details
 
 A lead that arrives without an email or phone gets a **Dig for contact details** button, on the
@@ -793,8 +819,18 @@ php -S 127.0.0.1:8000 -t . bin/serve.php
 ```bash
 php tests/import_update.php     # re-upload matching and change rules, no server needed
 php tests/import_screen.php     # the import screen, driven over HTTP
+php tests/export_names.php      # splitting a name, and the export columns built from it
 ```
 
-Both are local-only: they sign in with the seeded dev account and write leads, and they refuse to
-run against a database holding more than a couple of hundred of them. `tests/import_screen.php`
-needs the dev server up, and takes `PROSPECTOR_TEST_URL` if it is not on port 8099.
+All three are local-only: they sign in with the seeded dev account and write leads, and they refuse
+to run against a database holding more than a couple of hundred of them. The last two need the dev
+server up, and take `PROSPECTOR_TEST_URL` if it is not on port 8099.
+
+`export_names.php` also checks what gets sent to GoHighLevel, but only when pointed at the mock:
+
+```bash
+python3 tests/mock_ghl.py --port 8788 &
+PROSPECTOR_GHL_BASE=http://127.0.0.1:8788 php tests/export_names.php
+```
+
+Without that variable it skips the GoHighLevel part rather than reaching the real API.

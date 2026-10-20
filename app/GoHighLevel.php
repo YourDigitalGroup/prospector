@@ -123,12 +123,16 @@ final class GoHighLevel
      */
     public function pushLead(array $lead): array
     {
-        $names = self::splitName((string) ($lead['decision_maker'] ?? ''));
+        // The same split the export and the merge variables use. This had its
+        // own cruder copy, which sent "Dr. Yolanda Achebe" to GoHighLevel as a
+        // first name of "Dr." — and anything greeting by first name on that
+        // side then inherited it.
+        $names = Merge::splitName((string) ($lead['decision_maker'] ?? ''));
 
         $payload = array_filter([
             'locationId' => $this->locationId,
-            'firstName' => $names[0],
-            'lastName' => $names[1],
+            'firstName' => $names['first'],
+            'lastName' => $names['last'],
             'name' => (string) ($lead['decision_maker'] ?? '') !== ''
                 ? (string) $lead['decision_maker']
                 : (string) $lead['company'],
@@ -793,20 +797,6 @@ final class GoHighLevel
         $lines[] = 'Delivered ' . Clock::display((string) ($lead['created_at'] ?? Clock::now()), 'M j, Y');
 
         return implode("\n", $lines);
-    }
-
-    /** @return array{0: string, 1: string} */
-    private static function splitName(string $name): array
-    {
-        $name = trim(preg_replace('/\s+/', ' ', $name) ?? $name);
-        if ($name === '') {
-            return ['', ''];
-        }
-
-        $parts = explode(' ', $name);
-        $first = array_shift($parts) ?? '';
-
-        return [$first, implode(' ', $parts)];
     }
 
     private static function cityOf(string $market): string
