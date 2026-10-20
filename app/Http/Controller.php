@@ -17,6 +17,7 @@ use Prospector\LeadImport;
 use Prospector\Leads;
 use Prospector\LocalModel;
 use Prospector\Mailer;
+use Prospector\Merge;
 use Prospector\Outreach;
 use Prospector\Prospector;
 use Prospector\Runs;
@@ -1231,14 +1232,25 @@ final class Controller
             exit;
         }
 
+        // First and last name sit beside the whole name rather than replacing
+        // it. A lead stores one `decision_maker` string because that is how
+        // names arrive, but everything downstream — a mail merge, a GoHighLevel
+        // import, a spreadsheet sorted by surname — wants the parts. Splitting
+        // here rather than asking every source to supply three fields.
         fputcsv($out, [
             'Company', 'Website', 'Vertical', 'Door', 'Market', 'State',
-            'Decision maker', 'Title', 'Email', 'Email confidence', 'Direct phone',
+            'Decision maker', 'First name', 'Last name',
+            'Title', 'Email', 'Email confidence', 'Direct phone',
             'Main phone', 'LinkedIn', 'Fit score', 'Why them', 'Opening hook',
             'Status', 'Owner', 'In GoHighLevel', 'Delivered',
         ]);
 
         foreach ($leads as $lead) {
+            // The same split the email merge variables use, so a column in the
+            // export and a {{contact.first_name}} in a send cannot disagree
+            // about where someone's first name ends.
+            $names = Merge::splitName((string) $lead['decision_maker']);
+
             fputcsv($out, [
                 $lead['company'],
                 $lead['website'],
@@ -1247,6 +1259,8 @@ final class Controller
                 $lead['market'],
                 $lead['state'],
                 $lead['decision_maker'],
+                $names['first'],
+                $names['last'],
                 $lead['title'],
                 $lead['email'],
                 $lead['email_confidence'],

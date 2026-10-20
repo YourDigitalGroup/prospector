@@ -165,6 +165,11 @@ final class Merge
      * Trailing credentials are dropped, since "Cale Slack, DDS" should give a
      * last name of "Slack" and not "Slack, DDS".
      *
+     * A leading honorific is dropped too. "Dr. Yolanda Achebe" otherwise gives
+     * a first name of "Dr.", and the greeting that falls out of it — "Hi Dr.,"
+     * — goes to a real prospect. Healthcare and higher education are full of
+     * titled names, so this is not an edge case there.
+     *
      * @return array{first: string, last: string}
      */
     public static function splitName(string $name): array
@@ -174,6 +179,8 @@ final class Merge
         if ($name === '') {
             return ['first' => '', 'last' => ''];
         }
+
+        $name = self::withoutHonorific($name);
 
         // "Slack, Cale" — a sorted list, so the parts are the other way round.
         // Distinguished from "Cale Slack, DDS" by the comma coming before the
@@ -190,5 +197,30 @@ final class Merge
         }
 
         return ['first' => (string) array_shift($parts), 'last' => implode(' ', $parts)];
+    }
+
+    /**
+     * Drop a leading title so the next word is the actual first name.
+     *
+     * Deliberately a short list of unambiguous ones. "Sr." is left out because
+     * it is a suffix as often as a Spanish honorific, and getting it wrong
+     * costs more than leaving it alone. Nothing is dropped if doing so would
+     * leave no name behind, so a contact stored as "Dr." stays "Dr." rather
+     * than becoming blank.
+     */
+    private static function withoutHonorific(string $name): string
+    {
+        $titles = ['dr', 'mr', 'mrs', 'ms', 'mx', 'miss', 'prof', 'professor',
+                   'rev', 'reverend', 'fr', 'father', 'sir', 'dame', 'hon',
+                   'rabbi', 'pastor', 'capt', 'captain'];
+
+        $parts = explode(' ', $name);
+        $head = strtolower(rtrim((string) ($parts[0] ?? ''), '.'));
+
+        if (count($parts) > 1 && in_array($head, $titles, true)) {
+            return trim(implode(' ', array_slice($parts, 1)));
+        }
+
+        return $name;
     }
 }
