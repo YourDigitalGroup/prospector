@@ -827,24 +827,25 @@ fieldset { border: 0; margin: 0; padding: 0; }
 }
 
 /* --------------------------------------------- logged actions
-   What was last done to a lead, under what the lead now is. Quieter than a
-   status badge on purpose: the disposition is the headline and this is the
-   footnote, and two things competing for the same emphasis in one cell means
-   neither gets read. */
+   What was last done to a lead, under the person it was done to. Scott's
+   colour, solid, the same in both themes — it is meant to be spotted across a
+   long list, and a tint would read differently on dark and light. */
 
 .tag-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    display: inline-block;
     font-size: 11px;
-    font-weight: 600;
-    padding: 1px 7px;
+    font-weight: 700;
+    line-height: 1.5;
+    padding: 1px 8px;
     border-radius: 20px;
     white-space: nowrap;
-    background: var(--surface-3);
-    color: var(--text-dim);
-    border: 1px solid var(--border);
+    background: #ff004c;
+    color: #fff;
 }
+
+/* Its own line, spaced like the other sub-lines in the cell rather than
+   crowding the name above it. */
+.tag-row { margin: 4px 0 2px; line-height: 1; }
 
 /* The log buttons wrap rather than scroll: seven of them at phone width is
    three rows, and a row of buttons you have to swipe through is a row where

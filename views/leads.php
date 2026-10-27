@@ -385,11 +385,7 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                          replaces, so without this it is invisible on exactly the
                                          screen the list gets worked from. */ ?>
                                 <?php if (!empty($lead['last_action'])): ?>
-                                    <span class="tag-action tag-trailing"
-                                          title="<?= View::e(Leads::actionLabel((string) $lead['last_action'])) ?>, <?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>">
-                                        <?= View::e(Leads::actionShort((string) $lead['last_action'])) ?>
-                                        · <?= View::e(Leads::sinceLabel((string) $lead['last_action_at'])) ?>
-                                    </span>
+                                    <span class="tag-action tag-trailing" title="<?= View::e(Leads::actionLabel((string) $lead['last_action'])) ?>, <?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>"><?= View::e(Leads::actionShort((string) $lead['last_action']) . ' · ' . Leads::sinceLabel((string) $lead['last_action_at'])) ?></span>
                                 <?php endif; ?>
                             </td>
 
@@ -411,9 +407,21 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                             <td>
                                 <?php if (!empty($lead['decision_maker'])): ?>
                                     <div><?= View::e($lead['decision_maker']) ?></div>
-                                    <div class="cell-sub"><?= View::e($lead['title'] ?? '') ?></div>
                                 <?php else: ?>
-                                    <span class="muted">Not named</span>
+                                    <div class="muted">Not named</div>
+                                <?php endif; ?>
+                                <?php if (!empty($lead['decision_maker']) && !empty($lead['title'])): ?>
+                                    <?php /* Only when there is one — an empty title line was
+                                             pushing everything below it down on leads without. */ ?>
+                                    <div class="cell-sub"><?= View::e($lead['title']) ?></div>
+                                <?php endif; ?>
+                                <?php /* The last thing done, under who it was done to — after the
+                                         title rather than between it and the name it belongs to.
+                                         Built on one line: a pill laid out across several lines of
+                                         template carries dozens of spaces inside it, which is where
+                                         the uneven gaps came from. */ ?>
+                                <?php if (!empty($lead['last_action'])): ?>
+                                    <div class="tag-row"><span class="tag-action" title="<?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>"><?= View::e(Leads::actionLabel((string) $lead['last_action']) . ' · ' . Leads::sinceLabel((string) $lead['last_action_at'])) ?></span></div>
                                 <?php endif; ?>
                                 <?php if (!empty($lead['email'])): ?>
                                     <div class="cell-sub">
@@ -444,18 +452,6 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                 <span class="badge badge-<?= View::e($lead['status']) ?>">
                                     <?= View::e(Leads::statusLabel((string) $lead['status'])) ?>
                                 </span>
-                                <?php /* What was last done to this lead, under what it now is.
-                                         The two answer different questions and the disposition
-                                         alone cannot tell you a lead has gone quiet for a month. */ ?>
-                                <?php if (!empty($lead['last_action'])): ?>
-                                    <div class="cell-sub">
-                                        <span class="tag-action"
-                                              title="<?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>">
-                                            <?= View::e(Leads::actionLabel((string) $lead['last_action'])) ?>
-                                            · <?= View::e(Leads::sinceLabel((string) $lead['last_action_at'])) ?>
-                                        </span>
-                                    </div>
-                                <?php endif; ?>
                             </td>
                             <?php if ($isAdmin): ?>
                                 <td class="nowrap small dim"><?= View::e($lead['owner_name']) ?></td>
