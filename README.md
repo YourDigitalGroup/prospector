@@ -882,7 +882,15 @@ php tests/import_update.php     # re-upload matching and change rules, no server
 php tests/import_screen.php     # the import screen, driven over HTTP
 php tests/export_names.php      # splitting a name, and the export columns built from it
 php tests/actions_verticals.php # canonical verticals, and logging what you did
+node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm install --no-save playwright)
 ```
+
+`bulk_bar.js` is the odd one out, in JavaScript, because what it guards against lived in
+`assets/js/app.js` where no PHP check can see it. For a while every button in the bulk bar — Log,
+Apply, Archive — asked "Delete for good?", because the confirm was attached to the form they all
+share. And confirming the real Delete did nothing at all, because the form was re-sent without the
+button that was pressed, so the server never heard "delete". Every PHP suite was green throughout.
+Point it at a particular Chromium with `PLAYWRIGHT_CHROMIUM` if Playwright's own is not installed.
 
 All four are local-only: they sign in with the seeded dev account and write leads, and they refuse
 to run against a database holding more than a couple of hundred of them. All but the first need the

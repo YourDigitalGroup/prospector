@@ -584,14 +584,21 @@
     // A styled dialog rather than window.confirm, which cannot be themed, reads
     // as a browser malfunction on a phone, and is easy to dismiss by reflex.
     // The form is only submitted when the dialog says so.
+    //
+    // The attribute goes on the BUTTON that needs confirming, not on the form.
+    // The bulk bar is one form with a dozen buttons, and when this keyed off the
+    // form every one of them — Log, Apply, Archive — asked "Delete for good?".
     var pendingForm = null;
+    var pendingButton = null;
 
     document.addEventListener('submit', function (event) {
         var form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
+        if (form.dataset.confirmed === 'yes') return;
 
-        var dialogId = form.getAttribute('data-confirm-dialog');
-        if (!dialogId || form.dataset.confirmed === 'yes') return;
+        var pressed = event.submitter || null;
+        var dialogId = pressed ? pressed.getAttribute('data-confirm-dialog') : null;
+        if (!dialogId) return;
 
         var dialog = document.getElementById(dialogId);
         if (!dialog || typeof dialog.showModal !== 'function') return;
@@ -600,6 +607,7 @@
         event.stopImmediatePropagation();
 
         pendingForm = form;
+        pendingButton = pressed;
 
         // The count is only known at the moment of asking.
         var counter = dialog.querySelector('[data-confirm-count]');
@@ -618,19 +626,40 @@
 
             if (pendingForm) {
                 var form = pendingForm;
+                var button = pendingButton;
                 pendingForm = null;
+                pendingButton = null;
                 form.dataset.confirmed = 'yes';
-                // requestSubmit rather than submit(), so the submit listeners
-                // that carry the pressed button and show the busy state still
-                // run — submit() skips all of them.
-                if (form.requestSubmit) form.requestSubmit();
-                else form.submit();
+
+                // Resubmitted WITH the button that was pressed. Without it the
+                // button's name and value are not sent, the server never hears
+                // "delete", and the action falls back to whatever the status
+                // dropdown says — which is how bulk delete silently did nothing.
+                // requestSubmit rather than submit(), so the listeners that show
+                // the busy state still run.
+                if (form.requestSubmit) {
+                    form.requestSubmit(button || undefined);
+                } else {
+                    if (button && button.name) {
+                        var carry = document.createElement('input');
+                        carry.type = 'hidden';
+                        carry.name = button.name;
+                        carry.value = button.value;
+                        form.appendChild(carry);
+                    }
+                    form.submit();
+                }
+
+                // A form that stays on the page — a failed request, a back
+                // button — must ask again next time rather than remembering yes.
+                setTimeout(function () { delete form.dataset.confirmed; }, 0);
             }
             return;
         }
 
         if (event.target.closest('[data-confirm-no]')) {
             pendingForm = null;
+            pendingButton = null;
             var open = event.target.closest('dialog');
             if (open) open.close();
         }

@@ -226,8 +226,11 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <form method="post" action="<?= View::e(View::url('leads/bulk')) ?>" data-bulk-form
-                  data-confirm-dialog="bulk-delete-confirm">
+        <?php /* No confirm attribute on the form itself. Every button in the bulk
+                 bar submits this one form — mark, log, push, archive, delete — so
+                 a form-level confirm asked "Delete for good?" before all of them.
+                 It lives on the Delete button, and only that button asks. */ ?>
+        <form method="post" action="<?= View::e(View::url('leads/bulk')) ?>" data-bulk-form>
             <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
             <input type="hidden" name="return" value="<?= View::e($returnTo) ?>">
 
@@ -312,7 +315,8 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                     Archive
                 </button>
 
-                <button type="submit" class="btn btn-sm btn-delete" name="bulk_action" value="delete">
+                <button type="submit" class="btn btn-sm btn-delete" name="bulk_action" value="delete"
+                        data-confirm-dialog="bulk-delete-confirm">
                     <?php $name = 'trash'; $size = 14; require __DIR__ . '/partials/icon.php'; ?>
                     Delete
                 </button>
