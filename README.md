@@ -227,9 +227,10 @@ on the lead's timeline alongside everything else.
 having reached them, and moving a lead to Contacted because a voicemail was logged would put words
 in the caller's mouth. The two are set separately and on purpose.
 
-The leads list shows the most recent one as a tag under the status — `Called · 2d`, `Met in person
-· 1w` — so a lead that has gone quiet for six weeks looks different from one worked yesterday, which
-the disposition alone cannot tell you. On a phone the tag rides at the end of the one-line row and
+The leads list shows the most recent one as a red (`#ff004c`) tag under the contact's name —
+`Called · 2d`, `Met in person · 1w` — so a lead that has gone quiet for six weeks looks different
+from one worked yesterday, which the disposition alone cannot tell you. It sits after the job title
+rather than between the name and the title it belongs to. On a phone the tag rides at the end of the one-line row and
 shortens to `VM · 6w`, because the full wording crowds the company name off a 390px line and the
 company is what you are scanning for. The full version is in the tag's tooltip.
 
