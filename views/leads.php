@@ -248,6 +248,22 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                     <button type="submit" class="btn btn-sm">Apply</button>
                 </span>
 
+                <?php /* Logging what you did to a selection, which is how it
+                         actually happens — you work down a list making calls,
+                         then tick the ones you got through to. Its own picker
+                         rather than more entries in the one above: a
+                         disposition and an action are different things and
+                         mixing them in one menu invites setting the wrong one. */ ?>
+                <span class="bulk-group">
+                    <select name="log_action" aria-label="Log what you did to the selected leads">
+                        <option value="">Log what you did…</option>
+                        <?php foreach (Leads::ACTIONS as $key => $label): ?>
+                            <option value="<?= View::e($key) ?>"><?= View::e($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="btn btn-sm" name="bulk_action" value="log">Log</button>
+                </span>
+
                 <?php if ($ghlReady): ?>
                     <?php /* type=button, not submit: this one opens the composer
                              rather than posting the bulk form. */ ?>
@@ -360,6 +376,17 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                 <?php if ($lead['ghl_contact_id'] !== null): ?>
                                     <span class="badge badge-high" title="In GoHighLevel">GHL</span>
                                 <?php endif; ?>
+                                <?php /* The last action has to be here too. The status cell it
+                                         also lives in is one of the ones the one-line phone row
+                                         replaces, so without this it is invisible on exactly the
+                                         screen the list gets worked from. */ ?>
+                                <?php if (!empty($lead['last_action'])): ?>
+                                    <span class="tag-action tag-trailing"
+                                          title="<?= View::e(Leads::actionLabel((string) $lead['last_action'])) ?>, <?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>">
+                                        <?= View::e(Leads::actionShort((string) $lead['last_action'])) ?>
+                                        · <?= View::e(Leads::sinceLabel((string) $lead['last_action_at'])) ?>
+                                    </span>
+                                <?php endif; ?>
                             </td>
 
                             <td>
@@ -413,6 +440,18 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                 <span class="badge badge-<?= View::e($lead['status']) ?>">
                                     <?= View::e(Leads::statusLabel((string) $lead['status'])) ?>
                                 </span>
+                                <?php /* What was last done to this lead, under what it now is.
+                                         The two answer different questions and the disposition
+                                         alone cannot tell you a lead has gone quiet for a month. */ ?>
+                                <?php if (!empty($lead['last_action'])): ?>
+                                    <div class="cell-sub">
+                                        <span class="tag-action"
+                                              title="<?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>">
+                                            <?= View::e(Leads::actionLabel((string) $lead['last_action'])) ?>
+                                            · <?= View::e(Leads::sinceLabel((string) $lead['last_action_at'])) ?>
+                                        </span>
+                                    </div>
+                                <?php endif; ?>
                             </td>
                             <?php if ($isAdmin): ?>
                                 <td class="nowrap small dim"><?= View::e($lead['owner_name']) ?></td>

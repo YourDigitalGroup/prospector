@@ -55,7 +55,19 @@ if (!empty($lead['evidence'])) {
                 <?= View::e(Leads::statusLabel((string) $lead['status'])) ?>
             </span>
             <?php if (!empty($lead['vertical'])): ?>
-                <span class="badge badge-neutral"><?= View::e($lead['vertical']) ?></span>
+                <?php /* The heading it is filed under, plus the words it arrived
+                         as when they said more. Bucketing makes the filter
+                         usable; it should not lose the fact that this one is
+                         tribal gaming rather than a riverboat. */ ?>
+                <span class="badge badge-neutral"
+                      <?php if (!empty($lead['vertical_detail'])): ?>
+                          title="Filed under <?= View::e($lead['vertical']) ?> — the list said &ldquo;<?= View::e($lead['vertical_detail']) ?>&rdquo;"
+                      <?php endif; ?>>
+                    <?= View::e($lead['vertical']) ?>
+                    <?php if (!empty($lead['vertical_detail'])): ?>
+                        <span class="dim">· <?= View::e($lead['vertical_detail']) ?></span>
+                    <?php endif; ?>
+                </span>
             <?php endif; ?>
             <?php if (!empty($lead['door'])): ?>
                 <span class="badge badge-neutral"><?= View::e($lead['door']) ?></span>
@@ -345,6 +357,48 @@ if (!empty($lead['evidence'])) {
     </div>
 
     <div class="stack">
+        <?php /* What you did, as opposed to what the lead now is. Above the
+                 disposition because it is the thing that gets done every time
+                 — a call logged in two taps is a call that gets logged. */ ?>
+        <div class="card">
+            <div class="card-head">
+                <h2>Log what you did</h2>
+                <?php if (!empty($lead['last_action'])): ?>
+                    <span class="dim small">
+                        Last: <?= View::e(Leads::actionLabel((string) $lead['last_action'])) ?>
+                        <?= View::e(Leads::sinceLabel((string) $lead['last_action_at'])) ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+            <div class="card-body">
+                <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/log')) ?>">
+                    <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                    <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
+
+                    <div class="action-row">
+                        <?php foreach (Leads::ACTIONS as $key => $label): ?>
+                            <button type="submit" name="log_action" value="<?= View::e($key) ?>"
+                                    class="btn btn-sm btn-action">
+                                <?= View::e($label) ?>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="field mt-sm">
+                        <label for="log_note">Add a line about it <span class="muted" style="font-weight:500">(optional)</span></label>
+                        <input type="text" id="log_note" name="log_note"
+                               placeholder="Gatekeeper says he takes vendor calls Thursdays.">
+                    </div>
+
+                    <p class="hint">
+                        Logged as often as it happens, each one timestamped. This does not change
+                        the disposition — having called someone is not the same as having reached
+                        them.
+                    </p>
+                </form>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-head"><h2>Update this lead</h2></div>
             <div class="card-body">

@@ -314,6 +314,17 @@ final class Controller
                 }
                 break;
 
+            case 'log':
+                // What was done, as opposed to what the lead now is. Logged as
+                // many times as it happens; the disposition is left alone.
+                $logged = Request::input('log_action');
+                if (Leads::logAction($id, $logged, Request::input('log_note'), Auth::id())) {
+                    self::flash('success', Leads::actionLabel($logged) . ' — logged.');
+                } else {
+                    self::flash('error', 'Pick what you did first.');
+                }
+                break;
+
             case 'note':
                 $note = Request::input('note');
                 if ($note === '') {
@@ -721,6 +732,15 @@ final class Controller
             self::redirect($back);
         }
 
+        // Same again for logging: without an action picked there is nothing to
+        // record, and saying so once beats failing every row with the same
+        // reason and reporting it as a count.
+        $logAction = Request::input('log_action');
+        if ($action === 'log' && !array_key_exists($logAction, Leads::ACTIONS)) {
+            self::flash('error', 'Pick what you did before logging it.');
+            self::redirect($back);
+        }
+
         foreach ($ids as $id) {
             $lead = Leads::find($id);
             if ($lead === null || !Auth::canAccessUser((int) $lead['user_id'])) {
@@ -762,6 +782,12 @@ final class Controller
                 } else {
                     $failed++;
                     $messages[$result['message']] = true;
+                }
+            } elseif ($action === 'log') {
+                if (Leads::logAction($id, $logAction, Request::input('log_note'), Auth::id())) {
+                    $done++;
+                } else {
+                    $failed++;
                 }
             } elseif (array_key_exists($action, Leads::STATUSES)) {
                 Leads::setStatus($id, $action, null, Auth::id());

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Prospector\Support;
 
+use Prospector\Verticals;
+
 /**
  * Idempotent schema installer. Runs on every boot; each step is a no-op once
  * applied, so deploying a new version needs no separate migration command.
@@ -272,7 +274,74 @@ final class Schema
             ['leads', 'dig_result', 'TEXT NULL'],
             ['leads', 'dig_message', 'TEXT NULL'],
             ['leads', 'dig_at', 'VARCHAR(25) NULL'],
+            // The words the vertical arrived as, when the heading it was filed
+            // under says less. "Tribal gaming" and "Riverboat casino" are both
+            // Casino, and the difference between them is worth keeping.
+            ['leads', 'vertical_detail', 'VARCHAR(120) NULL'],
+            // The most recent logged action, copied onto the lead so the list
+            // can show it without a per-row lookup. Derived from the activity
+            // rows, which stay the record.
+            ['leads', 'last_action', 'VARCHAR(40) NULL'],
+            ['leads', 'last_action_at', 'VARCHAR(25) NULL'],
+            // Which action an activity row records. The body already reads
+            // well, but a column can be counted, filtered and re-derived from;
+            // a sentence cannot.
+            ['activities', 'action', 'VARCHAR(40) NULL'],
         ]);
+
+        self::normaliseVerticals();
+    }
+
+    /**
+     * Put existing leads under their loop's own vertical headings, once.
+     *
+     * New leads are filed on the way in, but a database that has been running
+     * for months is full of the fifteen spellings this exists to collapse, and
+     * the filter is built from what is actually stored. So the rows already
+     * there get the same treatment — one pass, guarded by a flag, because
+     * install() runs on every single request.
+     *
+     * Only the vertical moves. The original wording is kept in
+     * vertical_detail, so nothing is lost and a bad rule can be seen for what
+     * it did rather than having to be guessed at.
+     *
+     * Every step is idempotent, so a request that dies halfway through — before
+     * the flag is written — leaves the rows it did reach already correct and
+     * the next request finishes the rest. Running it again changes nothing.
+     */
+    private static function normaliseVerticals(): void
+    {
+        if (Settings::get('verticals_normalised') !== '') {
+            return;
+        }
+
+        $rows = Database::all(
+            "SELECT l.id, l.vertical, u.loop
+             FROM leads l JOIN users u ON u.id = l.user_id
+             WHERE l.vertical IS NOT NULL AND l.vertical <> ''"
+        );
+
+        foreach ($rows as $row) {
+            $loop = (string) ($row['loop'] ?? '');
+
+            if (!Verticals::manages($loop)) {
+                continue;
+            }
+
+            $raw = (string) $row['vertical'];
+            $canonical = Verticals::canonical($raw, $loop);
+
+            if ($canonical === $raw) {
+                continue;
+            }
+
+            Database::update('leads', [
+                'vertical' => mb_substr($canonical, 0, 80),
+                'vertical_detail' => mb_substr(Verticals::detail($raw, $canonical), 0, 120),
+            ], ['id' => (int) $row['id']]);
+        }
+
+        Settings::set('verticals_normalised', Clock::now());
     }
 
     /**

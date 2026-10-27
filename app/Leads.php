@@ -23,9 +23,59 @@ final class Leads
     /** Statuses that count as an active, working lead. */
     public const OPEN_STATUSES = ['new', 'contacted', 'no_answer', 'meeting'];
 
+    /**
+     * Things a person does to a lead, as opposed to what the lead now is.
+     *
+     * A status answers "where has this got to" and there is one of them. An
+     * action answers "what did I do, and when", and there are as many as the
+     * work takes — three calls, two emails and a visit is an ordinary week on
+     * one lead, and a single field cannot hold that.
+     *
+     * Deliberately short. A list long enough to need reading is a list people
+     * stop filling in, and an unlogged call is worse than a roughly-labelled
+     * one. Anything that does not fit goes in the note beside it.
+     */
+    public const ACTIONS = [
+        'called' => 'Called',
+        'voicemail' => 'Left a voicemail',
+        'emailed' => 'Emailed',
+        'texted' => 'Texted',
+        'met' => 'Met in person',
+        'linkedin' => 'LinkedIn message',
+        'proposal' => 'Sent a proposal',
+    ];
+
     public static function statusLabel(string $status): string
     {
         return self::STATUSES[$status] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
+    /**
+     * The same actions at phone width, where the tag shares a 390px line with
+     * the company name.
+     *
+     * "Left a voicemail · 6w" crowds the company down to "Haldane …", and the
+     * company is the thing you are scanning for. The full wording stays in the
+     * tag's title and on every other screen.
+     */
+    private const ACTIONS_SHORT = [
+        'called' => 'Call',
+        'voicemail' => 'VM',
+        'emailed' => 'Email',
+        'texted' => 'Text',
+        'met' => 'Met',
+        'linkedin' => 'LinkedIn',
+        'proposal' => 'Proposal',
+    ];
+
+    public static function actionLabel(string $action): string
+    {
+        return self::ACTIONS[$action] ?? ucfirst(str_replace('_', ' ', $action));
+    }
+
+    public static function actionShort(string $action): string
+    {
+        return self::ACTIONS_SHORT[$action] ?? self::actionLabel($action);
     }
 
     /** Normalized company name used for cross-batch de-duplication. */
@@ -211,6 +261,13 @@ final class Leads
                 continue;
             }
 
+            // Bucketed here rather than on the way to the database, so the
+            // import preview shows the heading the lead will actually end up
+            // under — the preview is a promise about the result.
+            if ($field === 'vertical') {
+                $incoming = self::canonicalVertical((int) $existing['user_id'], $incoming)['vertical'];
+            }
+
             $current = self::currentValue($field, $existing);
 
             if ($current === $incoming) {
@@ -392,6 +449,12 @@ final class Leads
         $now = Clock::now();
         $score = (int) ($lead['fit_score'] ?? 0);
 
+        // Free text in, one of the loop's own headings out — so the filter
+        // offers "Casino" once rather than offering the fifteen ways a casino
+        // can be described. The words that arrived are kept beside it when
+        // they said more.
+        $vertical = self::canonicalVertical($userId, (string) ($lead['vertical'] ?? ''));
+
         return Database::insert('leads', [
             'user_id' => $userId,
             'run_id' => $runId,
@@ -399,7 +462,8 @@ final class Leads
             'company_key' => mb_substr($key, 0, 190),
             'contact_key' => $contact,
             'website' => self::clean($lead['website'] ?? null, 255),
-            'vertical' => self::clean($lead['vertical'] ?? null, 80),
+            'vertical' => self::clean($vertical['vertical'], 80),
+            'vertical_detail' => self::clean($vertical['detail'], 120),
             'door' => self::clean($lead['door'] ?? null, 80),
             'market' => self::clean($lead['market'] ?? null, 120),
             'state' => self::clean($lead['state'] ?? null, 40),
@@ -421,6 +485,30 @@ final class Leads
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+    }
+
+    /**
+     * File a free-text vertical under the owning loop's heading.
+     *
+     * The loop comes from the owner rather than being passed in, because every
+     * caller that writes a lead already knows the owner and none of them know
+     * the loop. Cached per user: an import runs this once a row, and the answer
+     * cannot change inside one request.
+     *
+     * @return array{vertical: string, detail: string}
+     */
+    private static function canonicalVertical(int $userId, string $raw): array
+    {
+        static $loops = [];
+
+        if (!array_key_exists($userId, $loops)) {
+            $owner = Users::find($userId);
+            $loops[$userId] = (string) ($owner['loop'] ?? '');
+        }
+
+        $canonical = Verticals::canonical($raw, $loops[$userId]);
+
+        return ['vertical' => $canonical, 'detail' => Verticals::detail($raw, $canonical)];
     }
 
     private static function clean(mixed $value, int $length): ?string
@@ -729,6 +817,81 @@ final class Leads
         }
 
         return true;
+    }
+
+    /**
+     * Record that somebody did something to this lead.
+     *
+     * Every one of these is kept — that is the point of logging an action
+     * rather than setting a field. The lead also carries the most recent one,
+     * copied onto the row itself, so the list can show "Called · 2d" for three
+     * hundred leads without asking the activity table three hundred times.
+     * That copy is derived data and the activity rows remain the record.
+     *
+     * Logging an action deliberately does NOT change the disposition. Having
+     * called someone is not the same as having reached them, and quietly
+     * moving a lead to Contacted because a voicemail was logged would put
+     * words in the caller's mouth.
+     */
+    public static function logAction(int $leadId, string $action, ?string $note, ?int $actorId): bool
+    {
+        if (!array_key_exists($action, self::ACTIONS)) {
+            return false;
+        }
+
+        $note = trim((string) $note);
+        $now = Clock::now();
+
+        Database::insert('activities', [
+            'lead_id' => $leadId,
+            'user_id' => $actorId,
+            'type' => 'action',
+            'action' => $action,
+            'body' => $note === ''
+                ? self::actionLabel($action)
+                : self::actionLabel($action) . ' — ' . mb_substr($note, 0, 3000),
+            'created_at' => $now,
+        ]);
+
+        Database::update('leads', [
+            'last_action' => $action,
+            'last_action_at' => $now,
+            'updated_at' => $now,
+        ], ['id' => $leadId]);
+
+        return true;
+    }
+
+    /**
+     * How long ago, in the shortest form that is still honest.
+     *
+     * "2d" beside a lead is read at a glance; a timestamp is not. Today reads
+     * as "today" rather than "0d", because a zero that means "just now" is the
+     * sort of thing that gets misread as "never".
+     */
+    public static function sinceLabel(?string $when): string
+    {
+        $when = trim((string) $when);
+
+        if ($when === '') {
+            return '';
+        }
+
+        $then = strtotime($when);
+
+        if ($then === false) {
+            return '';
+        }
+
+        $days = (int) floor((strtotime(Clock::now()) - $then) / 86400);
+
+        return match (true) {
+            $days <= 0 => 'today',
+            $days === 1 => 'yesterday',
+            $days < 7 => $days . 'd',
+            $days < 70 => (int) round($days / 7) . 'w',
+            default => (int) round($days / 30) . 'mo',
+        };
     }
 
     public static function archive(int $leadId, int $actorId): void
