@@ -724,6 +724,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
 }
 .timeline li.is-note::before { background: var(--info); }
 .timeline li.is-status::before { background: var(--accent); }
+.timeline li.is-action::before { background: var(--success); }
 .timeline li.is-ghl::before { background: var(--violet); }
 .timeline li.is-ghl_error::before { background: var(--danger); }
 .timeline-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
@@ -824,6 +825,42 @@ fieldset { border: 0; margin: 0; padding: 0; }
     .kv dd { margin-bottom: 8px; }
     .topbar { padding: 10px 14px; }
 }
+
+/* --------------------------------------------- logged actions
+   What was last done to a lead, under what the lead now is. Quieter than a
+   status badge on purpose: the disposition is the headline and this is the
+   footnote, and two things competing for the same emphasis in one cell means
+   neither gets read. */
+
+.tag-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+    background: var(--surface-3);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+}
+
+/* The log buttons wrap rather than scroll: seven of them at phone width is
+   three rows, and a row of buttons you have to swipe through is a row where
+   the last two never get pressed. */
+.action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.btn-action { font-weight: 600; }
+
+/* On the one-line phone row the tag sits at the end, after the name. It must
+   not shrink — a half-rendered "Call…" says nothing — so the company and the
+   name give up the width instead, which they already do by truncating. */
+.tag-trailing { flex: 0 0 auto; margin-left: auto; }
 
 /* --------------------------------------------- the import preview
    A cell about to change is marked, and what it is changing from sits under

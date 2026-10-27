@@ -208,6 +208,34 @@ of the screen once something is selected — it sits above the list, so otherwis
 you would tick six leads, scroll back up past all of them, and only then choose
 an action.
 
+## Logging what you did
+
+A disposition answers *where has this got to* and there is exactly one of them. An action answers
+*what did I do, and when* — and there are as many as the work takes. Three calls, two emails and a
+visit is an ordinary month on one lead, and a single field cannot hold that.
+
+**Log what you did** sits at the top of every lead: Called, Left a voicemail, Emailed, Texted, Met
+in person, LinkedIn message, Sent a proposal, each one tap, with an optional line of context. From
+the list, tick any number of leads and use **Log what you did…** in the bulk bar — which is how it
+actually happens, working down a list making calls and then ticking the ones that connected.
+
+Each entry is timestamped and kept. Logging the same action twice is two entries, not an overwrite,
+because "called three times, no answer" is exactly the thing somebody needs to see. They all land
+on the lead's timeline alongside everything else.
+
+**Logging an action does not change the disposition.** Having called someone is not the same as
+having reached them, and moving a lead to Contacted because a voicemail was logged would put words
+in the caller's mouth. The two are set separately and on purpose.
+
+The leads list shows the most recent one as a tag under the status — `Called · 2d`, `Met in person
+· 1w` — so a lead that has gone quiet for six weeks looks different from one worked yesterday, which
+the disposition alone cannot tell you. On a phone the tag rides at the end of the one-line row and
+shortens to `VM · 6w`, because the full wording crowds the company name off a 390px line and the
+company is what you are scanning for. The full version is in the tag's tooltip.
+
+The last action is also copied onto the lead row itself, so a list of three hundred renders without
+asking the activity table three hundred times. That copy is derived; the activity rows are the record.
+
 ### The pipeline board
 
 Cards are dragged between stages with a mouse. HTML5 drag events do not fire on
@@ -272,6 +300,38 @@ spec in `app/loops/`, an entry in `Users::LOOPS` and `Users::RUNNABLE_LOOPS`, an
 
 If fewer than ten leads qualify, fewer than ten are delivered and the brief says why. That is
 deliberate — the loops are specified never to pad.
+
+### Verticals get filed under one heading
+
+A vertical arrives as whatever the research wrote that morning — "Tribal gaming", "Casino &
+Resort", "Gaming & Hospitality", "Tribal casino and hotel". All one thing to the person working the
+list, but the filter dropdown is built from the distinct values actually stored, so fifteen
+spellings become fifteen entries and the filter stops being useful at exactly the point there are
+enough leads to need it.
+
+So the vertical is filed under one of the loop's own qualifying verticals on the way in, by
+`app/Verticals.php`. Darren's client loop files under **Casino, Healthcare, Higher Ed, Ag,
+Retail** — the five the loop spec already names.
+
+Two rules make this safe to run over real data:
+
+- **An unrecognised vertical is left exactly as it came.** A lead filed under the wrong heading is
+  harder to find than one filed under an odd heading, because nobody thinks to look there. "Precision
+  manufacturing" stays "Precision manufacturing"; it does not get swept into the nearest bucket.
+- **The original wording is kept** in `vertical_detail` whenever it said more than the heading does,
+  and shown beside the badge on the lead. The difference between tribal gaming and a riverboat is two
+  different sales conversations, and bucketing should not cost you that.
+
+Rule order matters and is pinned by tests: a *farm & ranch store* is Retail, not Ag, and a *tribal
+health clinic* is Healthcare, not Casino, even though tribal organisations are most of the casino
+list. `Ag` matches as a whole word so it never catches "Agency".
+
+Leads already on file are brought into line once, on the first request after deploy, guarded by a
+setting so it does not run again. Every step is idempotent — a request that dies halfway leaves the
+rows it reached already correct and the next one finishes the job.
+
+**Only the client loop has a canonical set.** Billy's and Sara's verticals pass through untouched;
+adding either is a table edit in `Verticals::RULES`.
 
 Every email address carries a confidence label from the research:
 
@@ -781,6 +841,7 @@ app/
   Direct.php           one-off and bulk email/SMS to leads, sent on the spot
   Merge.php            {{contact.first_name}} and friends, resolved per lead
   Notices.php          unopened batches, and how to describe them
+  Verticals.php        free-text verticals filed under one heading per loop
   Attachment.php       uploaded files, and the URLs GoHighLevel fetches them by
   Signature.php        the per-user sign-off, its logo upload and its HTML
   LocalModel.php       the OpenAI-compatible client for a local model server
@@ -820,11 +881,12 @@ php -S 127.0.0.1:8000 -t . bin/serve.php
 php tests/import_update.php     # re-upload matching and change rules, no server needed
 php tests/import_screen.php     # the import screen, driven over HTTP
 php tests/export_names.php      # splitting a name, and the export columns built from it
+php tests/actions_verticals.php # canonical verticals, and logging what you did
 ```
 
-All three are local-only: they sign in with the seeded dev account and write leads, and they refuse
-to run against a database holding more than a couple of hundred of them. The last two need the dev
-server up, and take `PROSPECTOR_TEST_URL` if it is not on port 8099.
+All four are local-only: they sign in with the seeded dev account and write leads, and they refuse
+to run against a database holding more than a couple of hundred of them. All but the first need the
+dev server up, and take `PROSPECTOR_TEST_URL` if it is not on port 8099.
 
 `export_names.php` also checks what gets sent to GoHighLevel, but only when pointed at the mock:
 
