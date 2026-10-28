@@ -150,6 +150,90 @@ final class Users
         return $token === '' ? '' : Crypto::decrypt($token);
     }
 
+    /**
+     * The filter fields on the leads list that are remembered between visits.
+     *
+     * Only the ones a person sets in the filter panel. run_id is deliberately
+     * not here: it arrives from "see this batch" links, and remembering it
+     * would leave the list stuck on one morning's batch for good.
+     */
+    public const LEAD_FILTER_FIELDS = [
+        'q', 'owner', 'status', 'vertical', 'door', 'min_score',
+        'in_ghl', 'sort', 'unopened', 'archived',
+    ];
+
+    /**
+     * The leads-list filters this person last set, as query parameters.
+     *
+     * @return array<string, string>
+     */
+    public static function leadFilters(int $userId): array
+    {
+        $raw = Database::scalar('SELECT lead_filters FROM users WHERE id = :id', ['id' => $userId]);
+        $decoded = json_decode((string) $raw, true);
+
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return self::onlyLeadFilters($decoded);
+    }
+
+    /**
+     * Remember a set of filters, or forget them when nothing is narrowing.
+     *
+     * "Newest first" is the default order rather than a choice, so a set that
+     * holds nothing else is stored as nothing — otherwise clearing every
+     * filter by hand would still leave something "saved" to come back to.
+     *
+     * @param array<string, mixed> $filters
+     */
+    public static function saveLeadFilters(int $userId, array $filters): void
+    {
+        $filters = self::onlyLeadFilters($filters);
+
+        if (($filters['sort'] ?? '') === 'newest') {
+            unset($filters['sort']);
+        }
+
+        Database::update('users', [
+            'lead_filters' => $filters === [] ? null : json_encode($filters, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ], ['id' => $userId]);
+    }
+
+    public static function clearLeadFilters(int $userId): void
+    {
+        Database::update('users', ['lead_filters' => null], ['id' => $userId]);
+    }
+
+    /**
+     * Known fields only, non-empty values only, and no field longer than a
+     * search box could reasonably hold — this is read back into a redirect.
+     *
+     * @param array<mixed> $filters
+     * @return array<string, string>
+     */
+    private static function onlyLeadFilters(array $filters): array
+    {
+        $out = [];
+
+        foreach (self::LEAD_FILTER_FIELDS as $field) {
+            $value = $filters[$field] ?? '';
+
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+
+            if ($value !== '') {
+                $out[$field] = mb_substr($value, 0, 190);
+            }
+        }
+
+        return $out;
+    }
+
     public static function initials(string $name): string
     {
         $parts = preg_split('/\s+/', trim($name)) ?: [];

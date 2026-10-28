@@ -77,7 +77,7 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
             Export CSV
         </a>
         <?php if ($hasFilters): ?>
-            <a class="btn btn-ghost" href="<?= View::e(View::url('leads')) ?>">Clear filters</a>
+            <a class="btn btn-ghost" href="<?= View::e(View::url('leads', ['clear' => '1'])) ?>">Clear filters</a>
         <?php endif; ?>
     </div>
 </div>
@@ -85,6 +85,11 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
 <div class="card">
     <?php require __DIR__ . '/partials/filters_toggle.php'; ?>
     <form method="get" action="<?= View::e(View::url('leads')) ?>" class="filters collapsible" id="filters">
+        <?php /* Marks a submission as coming from this panel, which is what
+                 makes the filters stick until cleared. Links that open the list
+                 pre-filtered — the unopened pill, a batch, a dashboard tile —
+                 do not carry it, so a one-off look does not replace them. */ ?>
+        <input type="hidden" name="f" value="1">
         <div class="field grow">
             <label for="f-q">Search</label>
             <input type="search" id="f-q" name="q" value="<?= View::e($filters['search'] ?? '') ?>"
@@ -219,7 +224,7 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                 <?php endif; ?>
             </p>
             <?php if ($hasFilters): ?>
-                <a class="btn" href="<?= View::e(View::url('leads')) ?>">Clear filters</a>
+                <a class="btn" href="<?= View::e(View::url('leads', ['clear' => '1'])) ?>">Clear filters</a>
             <?php else: ?>
                 <a class="btn btn-primary" href="<?= View::e(View::url('leads/new')) ?>">Add a lead by hand</a>
                 <a class="btn" href="<?= View::e(View::url('runs')) ?>">Go to batches</a>
