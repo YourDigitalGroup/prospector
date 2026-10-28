@@ -122,6 +122,8 @@ final class Controller
     {
         self::requireLogin();
 
+        self::rememberLeadFilters();
+
         $filters = self::leadFilters();
         $page = max(1, Request::int('page', 1));
         $offset = ($page - 1) * self::PER_PAGE;
@@ -153,6 +155,61 @@ final class Controller
             ),
             'digest' => \Prospector\Notices::digest(self::scopeUserId()),
         ]);
+    }
+
+    /**
+     * Keep the leads list filtered the way this person left it.
+     *
+     * Three cases, decided by how the list was reached:
+     *
+     *   - From the filter panel (it carries f=1): remember what it says.
+     *   - Bare /leads, with nothing in the query at all: if something is
+     *     remembered, redirect to it, so the address bar, pagination, the
+     *     export link and the bulk bar's return address all see the same
+     *     filters the list is showing.
+     *   - Anything else — "6 unopened", "see this batch", a dashboard tile, a
+     *     search from the top bar: show what was asked for and leave the
+     *     remembered filters alone. Those are one-off looks; if they stuck,
+     *     one click on the unopened pill would leave the list showing only
+     *     unopened leads every time it was opened afterwards.
+     *
+     * Clear filters (clear=1) forgets them.
+     */
+    private static function rememberLeadFilters(): void
+    {
+        $userId = Auth::id();
+
+        if ($userId === null) {
+            return;
+        }
+
+        if (Request::input('clear') === '1') {
+            Users::clearLeadFilters($userId);
+            self::redirect('/leads');
+        }
+
+        if (Request::input('f') === '1') {
+            Users::saveLeadFilters($userId, $_GET);
+
+            return;
+        }
+
+        if ($_GET !== []) {
+            return;
+        }
+
+        $saved = Users::leadFilters($userId);
+
+        // An owner filter only means anything to an admin. If someone stops
+        // being one, a remembered owner would otherwise be quietly ignored on
+        // every visit; drop it instead.
+        if (!Auth::isAdmin()) {
+            unset($saved['owner']);
+        }
+
+        if ($saved !== []) {
+            self::redirect('/leads?' . http_build_query($saved));
+        }
     }
 
     /**

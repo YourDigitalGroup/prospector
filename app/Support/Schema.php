@@ -287,6 +287,11 @@ final class Schema
             // well, but a column can be counted, filtered and re-derived from;
             // a sentence cannot.
             ['activities', 'action', 'VARCHAR(40) NULL'],
+            // The filters this person last set on the leads list, so leaving
+            // and coming back finds the list the way they left it. Per user
+            // rather than per browser session: it should hold until they clear
+            // it, not until they sign out.
+            ['users', 'lead_filters', 'TEXT NULL'],
         ]);
 
         self::normaliseVerticals();

@@ -208,6 +208,27 @@ of the screen once something is selected — it sits above the list, so otherwis
 you would tick six leads, scroll back up past all of them, and only then choose
 an action.
 
+## Filters stay put
+
+Whatever you set in the filter panel on the leads list — vertical, status, buyer door, score, owner,
+search, sort — is still there when you come back: after opening a lead, visiting another page,
+reloading, or signing out and back in. It holds until **Clear filters**, or until you set
+everything back to "All" by hand, which counts as the same thing.
+
+It is remembered **per person**, in the database, rather than per browser session. A session ends at
+sign-out, and the point is that it holds until you clear it. So it follows you between your laptop
+and your phone, and nobody else's list is affected by yours.
+
+**Only the filter panel sets it.** A link that opens the list pre-filtered — the unopened pill in
+the top bar, "see this batch", a dashboard tile, the GoHighLevel page, a search from the top bar —
+shows what it was asked for and leaves your saved filters alone. Those are one-off looks: if they
+stuck, one click on "6 unopened" would leave the list showing only unopened leads every time it was
+opened afterwards. Go back to the list from the sidebar and your own filters are waiting.
+
+When the list is opened plain and something is remembered, it redirects to the filtered address
+rather than quietly applying it, so the address bar, paging, the export link and the bulk bar all
+agree on what is being shown.
+
 ## Logging what you did
 
 A disposition answers *where has this got to* and there is exactly one of them. An action answers
@@ -884,6 +905,7 @@ php tests/import_screen.php     # the import screen, driven over HTTP
 php tests/export_names.php      # splitting a name, and the export columns built from it
 php tests/actions_verticals.php # canonical verticals, and logging what you did
 node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm install --no-save playwright)
+node tests/sticky_filters.js    # filters that survive leaving the page, until cleared
 ```
 
 `bulk_bar.js` is the odd one out, in JavaScript, because what it guards against lived in
