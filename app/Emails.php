@@ -326,6 +326,10 @@ final class Emails
             'Sent step ' . (int) $email['step'] . ': ' . (string) $email['subject']
         );
 
+        // A cadence step going out is an email to that person, so the lead
+        // shows it and counts as contacted.
+        Leads::touch($leadId, 'emailed');
+
         // Two automation moments live here. The first email means the lead has
         // actually been contacted; the last one means the sequence is spent and
         // nobody replied, which is exactly when a longer nurture should pick

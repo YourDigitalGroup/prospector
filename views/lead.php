@@ -28,6 +28,8 @@ use Prospector\Support\View;
  * @var string|null $threadError
  * @var list<array<string, mixed>> $workflows
  * @var list<array<string, mixed>> $enrolments
+ * @var list<array<string, mixed>> $reminders
+ * @var array<string, array{label: string, date: string, time: string}> $reminderPresets
  * @var string $csrf
  */
 
@@ -394,6 +396,92 @@ if (!empty($lead['evidence'])) {
                         Logged as often as it happens, each one timestamped. This does not change
                         the disposition — having called someone is not the same as having reached
                         them.
+                    </p>
+                </form>
+            </div>
+        </div>
+
+        <?php /* Follow-up reminders. Directly under the log because that is
+                 the moment one gets set — "called, left a voicemail, try again
+                 Thursday". Emailed to whoever sets it, and shown as due in the
+                 top bar until it is done, so a late email still gets noticed. */ ?>
+        <div class="card" id="reminders">
+            <div class="card-head"><h2>Remind me to follow up</h2></div>
+            <div class="card-body">
+                <?php if ($reminders !== []): ?>
+                    <ul class="reminder-list">
+                        <?php foreach ($reminders as $reminder): ?>
+                            <?php $due = \Prospector\Reminders::isDue($reminder); ?>
+                            <li class="<?= $due ? 'is-due' : '' ?>">
+                                <div class="reminder-when">
+                                    <span class="tag-reminder<?= $due ? ' is-due' : '' ?>">
+                                        <?= $due ? 'Due' : 'Set' ?>
+                                    </span>
+                                    <strong><?= View::e(Clock::display((string) $reminder['due_at'], 'D M j, g:ia')) ?></strong>
+                                    <?php if ((int) $reminder['user_id'] !== (int) Auth::id()): ?>
+                                        <span class="dim small">for <?= View::e($reminder['user_name']) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if (!empty($reminder['note'])): ?>
+                                    <div class="small"><?= View::e($reminder['note']) ?></div>
+                                <?php endif; ?>
+                                <?php if ($reminder['sent_at'] !== null && $due): ?>
+                                    <div class="dim small">Emailed <?= View::e(Clock::display((string) $reminder['sent_at'], 'D g:ia')) ?></div>
+                                <?php elseif (!empty($reminder['error'])): ?>
+                                    <div class="small" style="color: var(--danger)">The email has not gone yet — <?= View::e($reminder['error']) ?></div>
+                                <?php endif; ?>
+                                <?php if ((int) $reminder['user_id'] === (int) Auth::id() || Auth::isAdmin()): ?>
+                                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/reminder-done')) ?>" class="inline-form">
+                                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                                        <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>">
+                                        <input type="hidden" name="reminder_id" value="<?= (int) $reminder['id'] ?>">
+                                        <button type="submit" class="linkish small"><?= $due ? 'Mark done' : 'Cancel' ?></button>
+                                    </form>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <hr class="divider">
+                <?php endif; ?>
+
+                <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/remind')) ?>">
+                    <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                    <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>#reminders">
+
+                    <div class="field">
+                        <label for="remind_note">What about <span class="muted" style="font-weight:500">(optional)</span></label>
+                        <input type="text" id="remind_note" name="remind_note" maxlength="1000"
+                               placeholder="Call back — she said after the board meeting.">
+                    </div>
+
+                    <div class="action-row">
+                        <?php foreach ($reminderPresets as $key => $preset): ?>
+                            <button type="submit" name="preset" value="<?= View::e($key) ?>" class="btn btn-sm btn-action">
+                                <?= View::e($preset['label']) ?>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <?php /* Or any day and time. Defaults to the first preset so the
+                             fields are never blank, and time to 9am because that is
+                             when a follow-up call actually gets made. */ ?>
+                    <div class="reminder-custom mt-sm">
+                        <div class="field">
+                            <label for="remind_date">Or pick a day</label>
+                            <input type="date" id="remind_date" name="remind_date"
+                                   min="<?= View::e(Clock::today()) ?>"
+                                   value="<?= View::e(reset($reminderPresets)['date']) ?>">
+                        </div>
+                        <div class="field">
+                            <label for="remind_time">Time</label>
+                            <input type="time" id="remind_time" name="remind_time" value="09:00" step="900">
+                        </div>
+                        <button type="submit" class="btn btn-sm">Set reminder</button>
+                    </div>
+
+                    <p class="hint">
+                        Emailed to you at that time (Central), and shown as due in the top bar until
+                        you mark it done — or log a call or email on this lead, which does it for you.
                     </p>
                 </form>
             </div>

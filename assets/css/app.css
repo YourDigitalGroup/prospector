@@ -574,7 +574,8 @@ label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-d
    because the new-lead form has two phone boxes and they were the only styled
    fields on the site rendering as browser defaults. */
 input[type="text"], input[type="email"], input[type="password"], input[type="number"],
-input[type="search"], input[type="url"], input[type="tel"], select, textarea {
+input[type="search"], input[type="url"], input[type="tel"],
+input[type="date"], input[type="time"], select, textarea {
     width: 100%;
     padding: 8px 11px;
     font-family: inherit;
@@ -845,7 +846,63 @@ fieldset { border: 0; margin: 0; padding: 0; }
 
 /* Its own line, spaced like the other sub-lines in the cell rather than
    crowding the name above it. */
-.tag-row { margin: 4px 0 2px; line-height: 1; }
+.tag-row { margin: 4px 0 2px; line-height: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ---------------------------------------------- follow-up reminders
+   Outlined while it is waiting and filled once it is due, so the list shows
+   at a glance which follow-ups are today's job. Amber rather than the red of
+   the action tag beside it: one says what was done, the other what is owed,
+   and the same colour for both would make them read as one thing. */
+
+.tag-reminder {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.5;
+    padding: 0 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+    color: var(--warning);
+    border: 1px solid color-mix(in srgb, var(--warning) 60%, transparent);
+}
+
+/* A fixed bright amber when filled, in both themes. Light mode's --warning is a
+   dark amber meant for text, and near-black on that would not be read. */
+.tag-reminder.is-due {
+    background: #ffc857;
+    border-color: #ffc857;
+    color: #111;
+}
+
+.reminder-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.reminder-list li { display: grid; gap: 3px; }
+.reminder-when { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+/* Day, time and the button on one line where there is room for them. */
+.reminder-custom { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.reminder-custom .field { margin: 0; flex: 0 1 auto; }
+.reminder-custom .field:first-child { width: 11rem; }
+.reminder-custom .field:nth-child(2) { width: 8.5rem; }
+/* Native date and time controls are not the same height as each other, which
+   left their labels a few pixels out of line. One height for both, and the
+   button. */
+.reminder-custom input, .reminder-custom .btn { height: 40px; min-height: 40px; }
+
+.pill-followup {
+    color: var(--warning);
+    border-color: color-mix(in srgb, var(--warning) 50%, var(--border));
+    font-weight: 650;
+}
+.pill-followup:hover { text-decoration: none; background: var(--surface-3); }
+
+/* The "who have I been in touch with" switch. Lit while it is on, so a list
+   that is quietly narrowed to contacted leads cannot be mistaken for all of
+   them. */
+.btn-contacted.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink, #111);
+}
 
 /* The log buttons wrap rather than scroll: seven of them at phone width is
    three rows, and a row of buttons you have to swipe through is a row where
@@ -1169,7 +1226,8 @@ dialog.sheet.sheet-sm { width: min(420px, calc(100% - 32px)); }
        screen. This is the single most irritating thing about the app on a
        phone and it costs nothing to fix. */
     input[type="text"], input[type="email"], input[type="password"], input[type="number"],
-    input[type="search"], input[type="url"], input[type="tel"], select, textarea {
+    input[type="search"], input[type="url"], input[type="tel"],
+    input[type="date"], input[type="time"], select, textarea {
         font-size: 16px;
     }
 

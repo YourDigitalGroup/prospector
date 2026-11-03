@@ -219,6 +219,14 @@ It is remembered **per person**, in the database, rather than per browser sessio
 sign-out, and the point is that it holds until you clear it. So it follows you between your laptop
 and your phone, and nobody else's list is affected by yours.
 
+**Show contacted**, beside Export, narrows the list to the leads you have been in touch with — and
+stays lit while it is on, so a narrowed list cannot be mistaken for all of them. Press it again for
+everyone. It sticks like any other filter. *Contacted* means anything logged against the lead, any
+email or text sent from Prospector (including cadence steps), or a disposition that can only be
+reached by talking to them: Contacted, No answer, Meeting booked, Signed, Not interested. *New* and
+*Disqualified* alone do not count — a lead is often disqualified from research without a word
+exchanged. The filter panel has the same choice, plus *Not yet contacted*.
+
 **Only the filter panel sets it.** A link that opens the list pre-filtered — the unopened pill in
 the top bar, "see this batch", a dashboard tile, the GoHighLevel page, a search from the top bar —
 shows what it was asked for and leaves your saved filters alone. Those are one-off looks: if they
@@ -228,6 +236,45 @@ opened afterwards. Go back to the list from the sidebar and your own filters are
 When the list is opened plain and something is remembered, it redirects to the filtered address
 rather than quietly applying it, so the address bar, paging, the export link and the bulk bar all
 agree on what is being shown.
+
+## Follow-up reminders
+
+**Remind me to follow up** sits under the action log on every lead. One tap for tomorrow, two days
+on, or next week — all at 9am, stepping over weekends — or any day and time, with an optional line
+about what to follow up on. Times are Central.
+
+When it comes due, two things happen, and they are deliberately independent:
+
+- **It is emailed to whoever set it** — the company, the contact, the number to call, the note, and
+  a button straight to the lead. A reminder belongs to the person who set it, not to the lead's
+  owner, so one Scott sets on Darren's lead goes to Scott.
+- **It shows as due in the app** — an amber *1 follow-up due* in the top bar, opening a list of just
+  those leads, and a filled *Follow up now* tag under the contact. That needs nothing to be
+  scheduled, so a reminder whose email was late, or went to spam, is still in front of you.
+
+It is dealt with when you press **Mark done**, or when you log a call, email, text or visit on that
+lead after it came due — following up is what it was asking for, so doing it answers it. A reminder
+still to come shows *Follow up Thu Nov 5*, outlined, and can be cancelled.
+
+### What sends the email — read this
+
+A reminder email is only as punctual as whatever wakes the app up. Two things do:
+
+1. **The scheduled webhook** (`cron.php`), which sends due reminders on every ping before anything
+   else — before the weekend rule too, since a reminder is someone's note to themselves at a time
+   they chose. **This is the one that makes them punctual**, and it is only as frequent as it is
+   pinged. The GitHub Action in `.github/workflows/daily-prospector.yml` pings every 30 minutes,
+   but only once the `PROSPECTOR_CRON_URL` repository secret is set — see *Making it run every
+   morning*. A cPanel cron job hitting the same URL every 10–15 minutes is tighter.
+2. **Any signed-in page load**, as a backstop: once a minute at most, after the page has gone to
+   the browser so nobody waits on a mail server. This only happens on hosting that can finish a
+   response early (PHP-FPM or LiteSpeed); elsewhere it stays out of the way rather than slow pages.
+   On its own it means reminders go out whenever someone next uses the app.
+
+Each reminder is claimed with a conditional update before it is sent, so the webhook and a page load
+landing in the same minute cannot email it twice. A send that fails is retried by the next sweep, up
+to three times, and the reason is shown on the lead. The in-app *due* signal never depends on any
+of this.
 
 ## Logging what you did
 
@@ -254,6 +301,11 @@ from one worked yesterday, which the disposition alone cannot tell you. It sits 
 rather than between the name and the title it belongs to. On a phone the tag rides at the end of the one-line row and
 shortens to `VM · 6w`, because the full wording crowds the company name off a 390px line and the
 company is what you are scanning for. The full version is in the tag's tooltip.
+
+Emails and texts sent **from inside Prospector** set the last action too, as do cadence steps — an
+email sent from here is an email. Sends made before this did not, so those were picked up once
+from the timeline they left, dated when they were sent; a call logged since is never overwritten by
+an older email.
 
 The last action is also copied onto the lead row itself, so a list of three hundred renders without
 asking the activity table three hundred times. That copy is derived; the activity rows are the record.
@@ -864,6 +916,7 @@ app/
   Merge.php            {{contact.first_name}} and friends, resolved per lead
   Notices.php          unopened batches, and how to describe them
   Verticals.php        free-text verticals filed under one heading per loop
+  Reminders.php        follow-up reminders: setting, the due list, and sending them
   Attachment.php       uploaded files, and the URLs GoHighLevel fetches them by
   Signature.php        the per-user sign-off, its logo upload and its HTML
   LocalModel.php       the OpenAI-compatible client for a local model server
@@ -904,8 +957,10 @@ php tests/import_update.php     # re-upload matching and change rules, no server
 php tests/import_screen.php     # the import screen, driven over HTTP
 php tests/export_names.php      # splitting a name, and the export columns built from it
 php tests/actions_verticals.php # canonical verticals, and logging what you did
+php tests/reminders.php         # reminder timing, sending, de-duplication, "contacted"
 node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm install --no-save playwright)
 node tests/sticky_filters.js    # filters that survive leaving the page, until cleared
+node tests/followups.js         # reminders, Show contacted and sticky verticals, as Darren
 ```
 
 `bulk_bar.js` is the odd one out, in JavaScript, because what it guards against lived in
@@ -915,9 +970,10 @@ share. And confirming the real Delete did nothing at all, because the form was r
 button that was pressed, so the server never heard "delete". Every PHP suite was green throughout.
 Point it at a particular Chromium with `PLAYWRIGHT_CHROMIUM` if Playwright's own is not installed.
 
-All four are local-only: they sign in with the seeded dev account and write leads, and they refuse
-to run against a database holding more than a couple of hundred of them. All but the first need the
-dev server up, and take `PROSPECTOR_TEST_URL` if it is not on port 8099.
+All of these are local-only: they sign in with the seeded dev account and write leads, and they refuse
+to run against a database holding more than a couple of hundred of them. `import_update.php` and
+`reminders.php` run on their own; the rest need the dev server up, and take `PROSPECTOR_TEST_URL` if
+it is not on port 8099.
 
 `export_names.php` also checks what gets sent to GoHighLevel, but only when pointed at the mock:
 

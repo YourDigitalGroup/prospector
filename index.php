@@ -33,6 +33,14 @@ Auth::start();
 // the last address a browser used is kept. Almost always a no-op.
 Support\Settings::rememberPublicUrl(View::baseUrl());
 
+// Follow-up reminder emails are only as punctual as whatever wakes the app up.
+// Any signed-in page load does, once a minute at most, after the page has been
+// handed to the browser — so the scheduled webhook is the main path, not the
+// only one.
+if (Auth::check()) {
+    \Prospector\Reminders::sweepAfterResponse();
+}
+
 View::share([
     'currentPath' => $path,
     'currentUser' => Auth::user(),

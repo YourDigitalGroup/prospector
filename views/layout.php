@@ -32,6 +32,11 @@ $dueEmails = Emails::counts($scopeUserId)['due'];
 // when ten new ones arrive.
 $unopened = Notices::unopenedCount($scopeUserId);
 
+// Follow-ups that have come due for the person looking — their own, whoever's
+// leads they are on. Shown whether or not the reminder email went out, so a
+// late or missing email still leaves something to see.
+$followUps = Auth::id() !== null ? \Prospector\Reminders::dueCount((int) Auth::id()) : 0;
+
 $nav = [
     'Prospect' => [
         ['path' => '/dashboard', 'label' => 'Home', 'icon' => 'home'],
@@ -160,6 +165,13 @@ $active = static function (string $path) use ($currentPath): bool {
                        title="Leads nobody has opened yet">
                         <?php $name = 'zap'; $size = 13; require __DIR__ . '/partials/icon.php'; ?>
                         <?= (int) $unopened ?> unopened
+                    </a>
+                <?php endif; ?>
+                <?php if ($followUps > 0): ?>
+                    <a class="pill pill-followup" href="<?= View::e(View::url('leads', ['due' => '1'])) ?>"
+                       title="Follow-up reminders that have come due">
+                        <?php $name = 'clock'; $size = 13; require __DIR__ . '/partials/icon.php'; ?>
+                        <?= (int) $followUps ?> follow-up<?= $followUps === 1 ? '' : 's' ?> due
                     </a>
                 <?php endif; ?>
                 <span class="pill hide-narrow" title="Daily batches are delivered on this schedule">

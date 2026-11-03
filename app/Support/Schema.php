@@ -92,6 +92,23 @@ final class Schema
                 updated_at VARCHAR(25) NOT NULL
             ){$suffix}",
 
+            // Follow-up reminders. due_at is UTC like every stored timestamp;
+            // sent_at is when the email went (or a sweep's claim on it), done_at
+            // is when it was dealt with — a Done press, or an action logged
+            // on the lead after it came due.
+            "CREATE TABLE IF NOT EXISTS reminders (
+                id {$id},
+                lead_id {$fk} NOT NULL,
+                user_id {$fk} NOT NULL,
+                due_at VARCHAR(25) NOT NULL,
+                note TEXT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                error TEXT NULL,
+                sent_at VARCHAR(25) NULL,
+                done_at VARCHAR(25) NULL,
+                created_at VARCHAR(25) NOT NULL
+            ){$suffix}",
+
             "CREATE TABLE IF NOT EXISTS activities (
                 id {$id},
                 lead_id {$fk} NOT NULL,
@@ -192,6 +209,11 @@ final class Schema
             'CREATE INDEX IF NOT EXISTS idx_emails_owner ON emails (user_id, status)',
             'CREATE UNIQUE INDEX IF NOT EXISTS idx_enrolments_pair ON enrolments (lead_id, workflow_id)',
             'CREATE INDEX IF NOT EXISTS idx_rules_owner ON automation_rules (user_id, active)',
+            // The sweep asks "what is due and not sent", the list asks "what is
+            // open on this lead", the top bar asks "what is due for this person".
+            'CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders (done_at, sent_at, due_at)',
+            'CREATE INDEX IF NOT EXISTS idx_reminders_lead ON reminders (lead_id, done_at)',
+            'CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders (user_id, done_at, due_at)',
         ];
 
         // Columns first: an index cannot span a column that is not there yet, and
@@ -295,6 +317,40 @@ final class Schema
         ]);
 
         self::normaliseVerticals();
+        self::backfillSentActions();
+    }
+
+    /**
+     * Give leads already emailed or texted from Prospector their last action.
+     *
+     * Sends from inside the app used to write a timeline entry without setting
+     * the lead's last action, so a lead Darren emailed from Prospector showed no
+     * "Emailed" tag and would not count as contacted. New sends set it; this
+     * catches up the ones made before, once, from the timeline they left.
+     *
+     * Leads::touch never moves a last action backwards, so a call logged since
+     * an old email stays the one that shows.
+     */
+    private static function backfillSentActions(): void
+    {
+        if (Settings::get('sent_actions_backfilled') !== '') {
+            return;
+        }
+
+        $sources = [
+            'emailed' => "SELECT lead_id, MAX(created_at) AS at FROM activities
+                          WHERE type = 'email' GROUP BY lead_id",
+            'texted' => "SELECT lead_id, MAX(created_at) AS at FROM activities
+                         WHERE type = 'note' AND body LIKE 'Texted:%' GROUP BY lead_id",
+        ];
+
+        foreach ($sources as $action => $sql) {
+            foreach (Database::all($sql) as $row) {
+                \Prospector\Leads::touch((int) $row['lead_id'], $action, (string) $row['at']);
+            }
+        }
+
+        Settings::set('sent_actions_backfilled', Clock::now());
     }
 
     /**

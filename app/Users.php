@@ -159,7 +159,7 @@ final class Users
      */
     public const LEAD_FILTER_FIELDS = [
         'q', 'owner', 'status', 'vertical', 'door', 'min_score',
-        'in_ghl', 'sort', 'unopened', 'archived',
+        'in_ghl', 'sort', 'unopened', 'archived', 'contacted',
     ];
 
     /**
