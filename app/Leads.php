@@ -602,6 +602,23 @@ final class Leads
             $where[] = "l.status IN ({$in})";
         }
 
+        // "Who have I been in touch with" — anything logged against the lead,
+        // an email sent from Prospector, or a disposition that can only be
+        // reached by talking to them. The other way round finds the untouched.
+        if (($filters['contacted'] ?? '') === '1' || ($filters['contacted'] ?? '') === '0') {
+            $in = implode(',', array_map(static fn (string $s): string => "'" . $s . "'", self::CONTACTED_STATUSES));
+            $touched = "(l.last_action IS NOT NULL OR l.status IN ({$in}))";
+            $where[] = $filters['contacted'] === '1' ? $touched : "NOT {$touched}";
+        }
+
+        // Follow-ups that have come due for one person and are not dealt with.
+        if (!empty($filters['due_for'])) {
+            $where[] = 'EXISTS (SELECT 1 FROM reminders r WHERE r.lead_id = l.id AND r.user_id = :due_for
+                           AND r.done_at IS NULL AND r.due_at <= :due_now)';
+            $params['due_for'] = (int) $filters['due_for'];
+            $params['due_now'] = Clock::now();
+        }
+
         if (!empty($filters['vertical'])) {
             $where[] = 'l.vertical = :vertical';
             $params['vertical'] = (string) $filters['vertical'];
@@ -672,13 +689,26 @@ final class Leads
         ];
         $order = $sorts[(string) ($filters['sort'] ?? 'newest')] ?? $sorts['newest'];
 
+        // The next open follow-up, for the row's tag. Only the viewer's own
+        // when there is a viewer: a reminder Scott set for himself on Darren's
+        // lead is Scott's job, and "Follow up now" on Darren's list because of
+        // it would send Darren chasing nothing.
+        $params = $c['params'];
+        $mine = '';
+        if (!empty($filters['viewer_id'])) {
+            $mine = ' AND r.user_id = :viewer_id';
+            $params['viewer_id'] = (int) $filters['viewer_id'];
+        }
+
         return Database::all(
-            "SELECT l.*, u.name AS owner_name
+            "SELECT l.*, u.name AS owner_name,
+                    (SELECT MIN(r.due_at) FROM reminders r
+                      WHERE r.lead_id = l.id AND r.done_at IS NULL{$mine}) AS next_reminder_at
              FROM leads l JOIN users u ON u.id = l.user_id
              WHERE {$c['sql']}
              ORDER BY {$order}
              LIMIT {$limit} OFFSET {$offset}",
-            $c['params']
+            $params
         );
     }
 
@@ -853,14 +883,52 @@ final class Leads
             'created_at' => $now,
         ]);
 
-        Database::update('leads', [
-            'last_action' => $action,
-            'last_action_at' => $now,
-            'updated_at' => $now,
-        ], ['id' => $leadId]);
+        self::touch($leadId, $action, $now);
+
+        // Following up is what a due reminder was asking for, so doing it
+        // answers the reminder. Only the logger's own, and only ones already
+        // due — a call today does not answer a reminder set for next week.
+        if ($actorId !== null) {
+            Reminders::completeDueFor($leadId, $actorId);
+        }
 
         return true;
     }
+
+    /**
+     * Record that something was done to this lead, without writing a timeline
+     * entry — for callers that already write their own.
+     *
+     * Sending an email from Prospector, or a cadence step going out, is an
+     * email to that person just as much as one logged by hand. Before this,
+     * those wrote to the timeline but never set the last action, so a lead
+     * emailed from inside the app showed no "Emailed" tag and would have been
+     * left out of "Contacted".
+     *
+     * Never moves the last action backwards: a backfill of an old email must not
+     * hide a call made since.
+     */
+    public static function touch(int $leadId, string $action, ?string $when = null): void
+    {
+        if (!array_key_exists($action, self::ACTIONS)) {
+            return;
+        }
+
+        $when ??= Clock::now();
+
+        Database::run(
+            'UPDATE leads SET last_action = :action, last_action_at = :when, updated_at = :now
+             WHERE id = :id AND (last_action_at IS NULL OR last_action_at <= :when2)',
+            ['action' => $action, 'when' => $when, 'when2' => $when, 'now' => Clock::now(), 'id' => $leadId]
+        );
+    }
+
+    /**
+     * Statuses that can only be reached by having been in touch. "New" has not
+     * been, and "Disqualified" is often decided from research alone, so neither
+     * counts on its own.
+     */
+    public const CONTACTED_STATUSES = ['contacted', 'no_answer', 'meeting', 'signed', 'not_interested'];
 
     /**
      * How long ago, in the shortest form that is still honest.
@@ -922,6 +990,7 @@ final class Leads
     {
         return (bool) Database::transaction(static function () use ($leadId): bool {
             Database::run('DELETE FROM activities WHERE lead_id = :id', ['id' => $leadId]);
+            Database::run('DELETE FROM reminders WHERE lead_id = :id', ['id' => $leadId]);
 
             return Database::run('DELETE FROM leads WHERE id = :id', ['id' => $leadId])->rowCount() > 0;
         });

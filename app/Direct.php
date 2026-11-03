@@ -243,6 +243,10 @@ final class Direct
                 : 'Texted: ' . mb_strimwidth($body, 0, self::ACTIVITY_EXCERPT, '…')
         );
 
+        // Sent from here is still sent: the lead gets its "Emailed" tag and
+        // counts as contacted, the same as one logged by hand.
+        Leads::touch($leadId, $channel === 'Email' ? 'emailed' : 'texted');
+
         // The same real-world event a cadence step 1 stands for: this lead has
         // now actually been contacted. Enrolment is deduplicated per lead and
         // workflow, so a cadence firing the same event later is harmless.

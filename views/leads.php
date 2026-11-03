@@ -34,7 +34,18 @@ $query = array_filter([
     'archived' => $filters['archived'] ?? '',
     'run_id' => !empty($filters['run_id']) ? $filters['run_id'] : '',
     'unopened' => !empty($filters['unopened']) ? '1' : '',
+    'contacted' => $filters['contacted'] ?? '',
+    'due' => !empty($filters['due_for']) ? '1' : '',
 ], static fn ($v): bool => $v !== '' && $v !== null);
+
+// The one-click "who have I been in touch with" switch. It keeps every other
+// filter, and carries f=1 so it sticks like anything set in the panel — this is
+// a way of working the list, not a one-off look.
+$contactedOn = ($filters['contacted'] ?? '') === '1';
+$contactedToggle = array_diff_key($query, ['contacted' => true, 'page' => true]) + ['f' => '1'];
+if (!$contactedOn) {
+    $contactedToggle['contacted'] = '1';
+}
 
 // "Clear filters" should only appear when something is actually narrowing the
 // list — the default sort order does not count.
@@ -53,9 +64,16 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
 
 <div class="page-head">
     <div>
-        <h1>Leads</h1>
+        <h1><?= !empty($filters['due_for']) ? 'Follow-ups due' : 'Leads' ?></h1>
         <div class="sub">
             <?= number_format($total) ?> <?= $total === 1 ? 'lead' : 'leads' ?> match
+            <?php if (!empty($filters['due_for'])): ?>
+                — reminders you set that have come due. Log a call or email, or mark one done, and it drops off.
+            <?php elseif (($filters['contacted'] ?? '') === '1'): ?>
+                — ones you have called, emailed, texted or met
+            <?php elseif (($filters['contacted'] ?? '') === '0'): ?>
+                — nobody has been in touch yet
+            <?php endif; ?>
             <?php if (!empty($filters['archived_only'])): ?>
                 — archived only
             <?php elseif (!empty($filters['include_archived'])): ?>
@@ -75,6 +93,13 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
         <a class="btn" href="<?= View::e(View::url('leads/export', $query)) ?>">
             <?php $name = 'download'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
             Export CSV
+        </a>
+        <a class="btn btn-contacted<?= $contactedOn ? ' is-on' : '' ?>"
+           href="<?= View::e(View::url('leads', $contactedToggle)) ?>"
+           aria-pressed="<?= $contactedOn ? 'true' : 'false' ?>"
+           title="<?= $contactedOn ? 'Show every lead again' : 'Only the leads you have called, emailed, texted or met' ?>">
+            <?php $name = 'check'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+            <?= $contactedOn ? 'Contacted only' : 'Show contacted' ?>
         </a>
         <?php if ($hasFilters): ?>
             <a class="btn btn-ghost" href="<?= View::e(View::url('leads', ['clear' => '1'])) ?>">Clear filters</a>
@@ -196,6 +221,15 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
             <select id="f-unopened" name="unopened" data-autosubmit>
                 <option value="">Any</option>
                 <option value="1" <?= !empty($filters['unopened']) ? 'selected' : '' ?>>Not opened yet</option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="f-contacted">Contacted</label>
+            <select id="f-contacted" name="contacted" data-autosubmit>
+                <option value="">Anyone</option>
+                <option value="1" <?= ($filters['contacted'] ?? '') === '1' ? 'selected' : '' ?>>Contacted</option>
+                <option value="0" <?= ($filters['contacted'] ?? '') === '0' ? 'selected' : '' ?>>Not yet contacted</option>
             </select>
         </div>
 
@@ -425,8 +459,8 @@ $returnTo = '/leads' . ($query !== [] ? '?' . http_build_query($query) : '');
                                          Built on one line: a pill laid out across several lines of
                                          template carries dozens of spaces inside it, which is where
                                          the uneven gaps came from. */ ?>
-                                <?php if (!empty($lead['last_action'])): ?>
-                                    <div class="tag-row"><span class="tag-action" title="<?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>"><?= View::e(Leads::actionLabel((string) $lead['last_action']) . ' · ' . Leads::sinceLabel((string) $lead['last_action_at'])) ?></span></div>
+                                <?php if (!empty($lead['last_action']) || !empty($lead['next_reminder_at'])): ?>
+                                    <div class="tag-row"><?php if (!empty($lead['last_action'])): ?><span class="tag-action" title="<?= View::e(Clock::display((string) $lead['last_action_at'], 'M j, Y')) ?>"><?= View::e(Leads::actionLabel((string) $lead['last_action']) . ' · ' . Leads::sinceLabel((string) $lead['last_action_at'])) ?></span><?php endif; ?><?php if (!empty($lead['next_reminder_at'])): ?><?php $reminderDue = \Prospector\Reminders::isDue(['due_at' => $lead['next_reminder_at']]); ?> <span class="tag-reminder<?= $reminderDue ? ' is-due' : '' ?>" title="Follow-up reminder"><?= View::e(($reminderDue ? 'Follow up now' : 'Follow up ' . Clock::display((string) $lead['next_reminder_at'], 'D M j'))) ?></span><?php endif; ?></div>
                                 <?php endif; ?>
                                 <?php if (!empty($lead['email'])): ?>
                                     <div class="cell-sub">

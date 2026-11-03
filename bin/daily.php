@@ -27,6 +27,7 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 
 use Prospector\Emails;
 use Prospector\Prospector;
+use Prospector\Reminders;
 use Prospector\Runs;
 use Prospector\Support\Background;
 use Prospector\Support\Clock;
@@ -134,8 +135,21 @@ if ($dryRun) {
 // Above the engine and API-key checks on purpose: those govern researching new
 // leads. An external worker or a missing key must not silently stall outreach
 // that is already written and approved.
-$outreach = Emails::sendDue();
 $exitCode = 0;
+
+// Follow-up reminders, for the same reason and before the same checks.
+$reminders = Reminders::sendDue();
+if ($reminders['sent'] > 0 || $reminders['failed'] > 0) {
+    $say(sprintf('  remind %d sent, %d failed.', $reminders['sent'], $reminders['failed']));
+    foreach ($reminders['messages'] as $message) {
+        $say('        ' . $message);
+    }
+    if ($reminders['failed'] > 0) {
+        $exitCode = 1;
+    }
+}
+
+$outreach = Emails::sendDue();
 
 if ($outreach['sent'] > 0 || $outreach['failed'] > 0 || $outreach['held'] > 0) {
     $say(sprintf(

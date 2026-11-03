@@ -19,6 +19,7 @@ use Prospector\LocalModel;
 use Prospector\Mailer;
 use Prospector\Merge;
 use Prospector\Outreach;
+use Prospector\Reminders;
 use Prospector\Prospector;
 use Prospector\Runs;
 use Prospector\Support\Background;
@@ -286,6 +287,8 @@ final class Controller
             'title' => (string) $lead['company'],
             'lead' => $lead,
             'activities' => Leads::activities($id),
+            'reminders' => Reminders::openFor($id),
+            'reminderPresets' => Reminders::presets(),
             'owners' => Auth::isAdmin() ? Users::all() : [],
             'ghlReady' => GoHighLevel::forUser($owner) !== null,
             // Everything the compose box needs to explain itself before anyone
@@ -380,6 +383,46 @@ final class Controller
                 } else {
                     self::flash('error', 'Pick what you did first.');
                 }
+                break;
+
+            case 'remind':
+                // A preset is resolved now, at the moment it is pressed — not
+                // from dates printed into the page, which would make "tomorrow"
+                // mean today for anyone who left the lead open overnight. The
+                // custom row carries what was typed. Both are business time.
+                $preset = Reminders::presets()[Request::input('preset')] ?? null;
+                $dueAt = $preset !== null
+                    ? Reminders::fromLocal($preset['date'], $preset['time'])
+                    : Reminders::fromLocal(Request::input('remind_date'), Request::input('remind_time'));
+
+                if ($dueAt === null) {
+                    self::flash('error', 'Pick a day for the reminder.');
+                    break;
+                }
+
+                if (strtotime($dueAt) <= strtotime(Clock::now())) {
+                    self::flash('error', 'That time has already passed — pick one in the future.');
+                    break;
+                }
+
+                Reminders::create($id, (int) Auth::id(), $dueAt, Request::input('remind_note'));
+                self::flash('success', 'Reminder set for ' . Clock::display($dueAt, 'l, M j \\a\\t g:ia') . '. It will be emailed to you then.');
+                break;
+
+            case 'reminder-done':
+                $reminder = Reminders::find(Request::int('reminder_id'));
+
+                // Only a reminder on this lead, and only your own unless you
+                // are an admin — the lead check above does not cover whose
+                // reminder it is.
+                if ($reminder === null || (int) $reminder['lead_id'] !== $id
+                    || ((int) $reminder['user_id'] !== Auth::id() && !Auth::isAdmin())) {
+                    self::flash('error', 'That reminder could not be found.');
+                    break;
+                }
+
+                Reminders::done((int) $reminder['id']);
+                self::flash('success', Reminders::isDue($reminder) ? 'Follow-up marked done.' : 'Reminder cancelled.');
                 break;
 
             case 'note':
@@ -1897,6 +1940,14 @@ final class Controller
             'archived_only' => $archived === 'only',
             'run_id' => Request::int('run_id'),
             'unopened' => Request::input('unopened') === '1',
+            // '1' for leads someone has been in touch with, '0' for the ones
+            // nobody has yet.
+            'contacted' => in_array(Request::input('contacted'), ['0', '1'], true) ? Request::input('contacted') : '',
+            // Follow-ups due for whoever is looking. A one-off view from the
+            // top bar, never remembered — it changes by the hour.
+            'due_for' => Request::input('due') === '1' ? Auth::id() : null,
+            // Whose reminders the rows' follow-up tags describe.
+            'viewer_id' => Auth::id(),
         ];
 
         if (Auth::isAdmin()) {

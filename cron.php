@@ -19,6 +19,7 @@ require __DIR__ . '/app/bootstrap.php';
 use Prospector\Automations;
 use Prospector\Emails;
 use Prospector\Prospector;
+use Prospector\Reminders;
 use Prospector\Support\Background;
 use Prospector\Support\Clock;
 use Prospector\Support\Crypto;
@@ -78,6 +79,18 @@ $lines[] = 'Prospector cron — ' . $now->format('D, M j Y g:i a T');
  * Sunday is worse than sending it a day late, so when weekday-only delivery is
  * on, due steps wait for Monday.
  */
+// Follow-up reminders first of all. Unlike outreach these ignore the weekend
+// rule: holding cold email for Monday is courtesy to the recipient, but a
+// reminder is someone's note to themselves, set for the time they chose.
+$reminders = Reminders::sendDue();
+if ($reminders['sent'] > 0 || $reminders['failed'] > 0) {
+    $lines[] = sprintf('Reminders: %d sent, %d failed.', $reminders['sent'], $reminders['failed']);
+    foreach ($reminders['messages'] as $message) {
+        $lines[] = '  - ' . $message;
+    }
+    Background::log(sprintf('Cron reminders: %d sent, %d failed.', $reminders['sent'], $reminders['failed']));
+}
+
 if ($weekdaysOnly && Clock::isWeekend($now) && !$force) {
     $lines[] = 'Weekend — queued outreach waits for a weekday.';
 } else {
