@@ -445,6 +445,26 @@ Everything entered on a given day hangs off one "Added by hand" batch for that o
 of business cards shows up as a single entry on **Daily batches** and still counts towards the
 day's total on the dashboard. **Save and add another** comes straight back to an empty form.
 
+### Editing a lead
+
+**Edit lead** at the top of any lead, or **Edit** on its Contact card — which lands straight on the
+contact's name, the thing most often wrong. It is the same form as adding one, filled in, so the two
+cannot drift apart.
+
+Unlike a re-upload, **a blank field here clears it**. On an upload an empty cell is just a column the
+file did not carry; here it is somebody deleting a wrong address on purpose.
+
+Everything else an upload is careful about still holds. The vertical is filed under its heading and
+keeps its original wording. Renaming the company, the contact or the email moves the de-duplication
+keys with it, so the next upload of that list updates this lead rather than adding a second one. An
+edit that would make this lead a copy of another for the same owner is refused, naming the other
+one. **Status is not on this form** — it has its own control on the lead, which writes the timeline
+and starts automations. Opening the form and saving it untouched changes nothing.
+
+Every change goes on the lead's history with what it was — *contact: darren → Darren Kuyper*, *email
+cleared (was wrong@example.com)* — so a bad edit can be seen and put back. Anyone who can see a lead
+can edit it; nobody can edit somebody else's.
+
 ### Uploading a list by hand
 
 **Leads → Upload leads** takes a CSV or a JSON array. Header names are matched loosely, so
@@ -958,6 +978,7 @@ php tests/import_screen.php     # the import screen, driven over HTTP
 php tests/export_names.php      # splitting a name, and the export columns built from it
 php tests/actions_verticals.php # canonical verticals, and logging what you did
 php tests/reminders.php         # reminder timing, sending, de-duplication, "contacted"
+php tests/lead_edit.php         # editing a lead: clearing, renaming, duplicates, who may
 node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm install --no-save playwright)
 node tests/sticky_filters.js    # filters that survive leaving the page, until cleared
 node tests/followups.js         # reminders, Show contacted and sticky verticals, as Darren

@@ -407,6 +407,113 @@ final class Leads
         return count($changes);
     }
 
+    /**
+     * Save a lead edited by hand.
+     *
+     * Different from a re-upload in one way that matters: a blank field here
+     * means "clear it". On an upload an empty cell is just a column the file
+     * did not carry; here it is somebody deleting a wrong address on purpose.
+     *
+     * Everything an upload is careful about still holds — the vertical is filed
+     * under its heading, the de-duplication keys move with the company, name
+     * and email, and a change that would make this lead a copy of another one
+     * for the same owner is refused, naming the other one. Status is not edited
+     * here; it has its own control. Every changed field is written to the
+     * timeline with what it was, so a bad edit can be seen and put back.
+     *
+     * @param array<string, string> $values as read from LeadForm
+     * @return array{ok: bool, errors: array<string, string>, changed: list<string>}
+     */
+    public static function edit(int $leadId, array $values, ?int $actorId): array
+    {
+        $lead = self::find($leadId);
+
+        if ($lead === null) {
+            return ['ok' => false, 'errors' => ['company' => 'That lead no longer exists.'], 'changed' => []];
+        }
+
+        $checked = LeadForm::validate($values);
+
+        if ($checked['errors'] !== []) {
+            return ['ok' => false, 'errors' => $checked['errors'], 'changed' => []];
+        }
+
+        $in = $checked['lead'];
+        $fields = array_values(array_diff(LeadForm::fields(), ['status']));
+        $vertical = self::canonicalVertical((int) $lead['user_id'], (string) ($in['vertical'] ?? ''));
+
+        $next = [];
+        foreach ($fields as $field) {
+            $next[$field] = match ($field) {
+                'fit_score' => (int) ($in['fit_score'] ?? 0),
+                'vertical' => self::clean($vertical['vertical'], 80),
+                'company' => mb_substr(trim((string) $in['company']), 0, 190),
+                default => self::clean($in[$field] ?? null, self::lengthFor($field)),
+            };
+        }
+        $next['vertical_detail'] = self::clean($vertical['detail'], 120);
+
+        // The keys that say whether two rows are the same person at the same
+        // company. Recomputed from what the lead will say after the edit.
+        $next['company_key'] = mb_substr(self::companyKey((string) $next['company']), 0, 190);
+        $next['contact_key'] = self::contactKey($next);
+
+        $clash = Database::first(
+            'SELECT id, company, decision_maker FROM leads
+             WHERE user_id = :uid AND company_key = :key AND contact_key = :contact AND id <> :id',
+            ['uid' => (int) $lead['user_id'], 'key' => $next['company_key'],
+             'contact' => $next['contact_key'], 'id' => $leadId]
+        );
+
+        if ($clash !== null) {
+            $who = trim((string) ($clash['decision_maker'] ?? ''));
+
+            return ['ok' => false, 'changed' => [], 'errors' => [
+                'decision_maker' => ($who !== '' ? $who : 'Somebody with no name') . ' at '
+                    . (string) $clash['company'] . ' is already on file as lead #' . (int) $clash['id']
+                    . ' — saving this would make two of the same person.',
+            ]];
+        }
+
+        // What actually moved, compared the way the form shows it, so an
+        // untouched field round-tripping through the form is not a change.
+        $before = LeadForm::fromLead($lead);
+        $after = LeadForm::fromLead(array_merge($lead, $next, [
+            'evidence' => $next['evidence'] === null ? null : json_encode($next['evidence'], JSON_UNESCAPED_SLASHES),
+        ]));
+
+        $changes = [];
+        foreach ($fields as $field) {
+            if (($before[$field] ?? '') !== ($after[$field] ?? '')) {
+                $changes[$field] = ['from' => $before[$field] ?? '', 'to' => $after[$field] ?? ''];
+            }
+        }
+
+        if ($changes === []) {
+            return ['ok' => true, 'errors' => [], 'changed' => []];
+        }
+
+        $next['evidence'] = $next['evidence'] === null ? null : json_encode($next['evidence'], JSON_UNESCAPED_SLASHES);
+        $next['updated_at'] = Clock::now();
+
+        Database::update('leads', $next, ['id' => $leadId]);
+
+        $described = [];
+        foreach ($changes as $field => $change) {
+            $label = strtolower(LeadForm::field($field)['label']);
+            $described[] = match (true) {
+                $change['from'] === '' => $label . ' set to ' . mb_strimwidth($change['to'], 0, 60, '…'),
+                $change['to'] === '' => $label . ' cleared (was ' . mb_strimwidth($change['from'], 0, 40, '…') . ')',
+                default => $label . ': ' . mb_strimwidth($change['from'], 0, 30, '…')
+                    . ' → ' . mb_strimwidth($change['to'], 0, 40, '…'),
+            };
+        }
+
+        self::addActivity($leadId, $actorId, 'note', 'Edited — ' . implode('; ', $described));
+
+        return ['ok' => true, 'errors' => [], 'changed' => array_keys($changes)];
+    }
+
     /** Column widths, so an update truncates the same way an insert does. */
     private static function lengthFor(string $field): int
     {
@@ -418,6 +525,7 @@ final class Leads
             'email_confidence' => 20,
             'phone', 'direct_phone' => 60,
             'why', 'hook' => 2000,
+            'evidence' => 4000,
             default => 190,
         };
     }

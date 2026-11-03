@@ -1,7 +1,6 @@
 <?php
 
 use Prospector\Auth;
-use Prospector\LeadForm;
 use Prospector\Support\View;
 
 /**
@@ -68,55 +67,7 @@ use Prospector\Support\View;
         </div>
     <?php endif; ?>
 
-    <?php foreach ($groups as $heading => $fields): ?>
-        <div class="card">
-            <div class="card-head"><h2><?= View::e($heading) ?></h2></div>
-            <div class="card-body">
-                <div class="field-grid">
-                    <?php foreach ($fields as $field): ?>
-                        <?php
-                        $spec = LeadForm::field($field);
-                        $value = (string) ($values[$field] ?? '');
-                        $error = $errors[$field] ?? null;
-                        $wide = ($spec['type'] ?? 'text') === 'textarea';
-                        ?>
-                        <div class="field<?= $wide ? ' field-wide' : '' ?>">
-                            <label for="f-<?= View::e($field) ?>"><?= View::e($spec['label']) ?></label>
-
-                            <?php if (($spec['type'] ?? '') === 'textarea'): ?>
-                                <textarea id="f-<?= View::e($field) ?>" name="<?= View::e($field) ?>"
-                                          rows="<?= (int) ($spec['rows'] ?? 3) ?>"
-                                          placeholder="<?= View::e($spec['placeholder'] ?? '') ?>"><?= View::e($value) ?></textarea>
-
-                            <?php elseif (($spec['type'] ?? '') === 'select'): ?>
-                                <select id="f-<?= View::e($field) ?>" name="<?= View::e($field) ?>">
-                                    <?php foreach (($spec['options'] ?? []) as $key => $label): ?>
-                                        <option value="<?= View::e((string) $key) ?>" <?= $value === (string) $key ? 'selected' : '' ?>>
-                                            <?= View::e((string) $label) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-
-                            <?php else: ?>
-                                <input type="<?= View::e($spec['type'] ?? 'text') ?>"
-                                       id="f-<?= View::e($field) ?>" name="<?= View::e($field) ?>"
-                                       value="<?= View::e($value) ?>"
-                                       <?php if (($spec['type'] ?? '') === 'number'): ?>min="0" max="100"<?php endif; ?>
-                                       <?= $field === 'company' ? 'required autofocus' : '' ?>
-                                       placeholder="<?= View::e($spec['placeholder'] ?? '') ?>">
-                            <?php endif; ?>
-
-                            <?php if ($error !== null): ?>
-                                <div class="hint hint-error"><?= View::e($error) ?></div>
-                            <?php elseif (isset($spec['hint'])): ?>
-                                <div class="hint"><?= View::e($spec['hint']) ?></div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </div>
-    <?php endforeach; ?>
+    <?php require __DIR__ . '/partials/lead_fields.php'; ?>
 
     <div class="card">
         <div class="card-body form-actions">

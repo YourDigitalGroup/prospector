@@ -846,6 +846,10 @@ fieldset { border: 0; margin: 0; padding: 0; }
 
 /* Its own line, spaced like the other sub-lines in the cell rather than
    crowding the name above it. */
+/* A link that jumps to a form field — "Edit" on the Contact card lands on the
+   contact name — must not park it underneath the sticky top bar. */
+.field input, .field select, .field textarea { scroll-margin-top: 140px; }
+
 .tag-row { margin: 4px 0 2px; line-height: 1; display: flex; flex-wrap: wrap; gap: 4px; }
 
 /* ---------------------------------------------- follow-up reminders
