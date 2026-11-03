@@ -80,6 +80,10 @@ if (!empty($lead['evidence'])) {
         </div>
     </div>
     <div class="page-head-actions">
+        <a class="btn" href="<?= View::e(View::url(ltrim($leadUrl, '/') . '/edit')) ?>">
+            <?php $name = 'edit'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
+            Edit lead
+        </a>
         <?php if (!empty($lead['website'])): ?>
             <a class="btn" href="<?= View::e($lead['website']) ?>" target="_blank" rel="noopener noreferrer">
                 <?php $name = 'external'; $size = 15; require __DIR__ . '/partials/icon.php'; ?>
@@ -137,6 +141,7 @@ if (!empty($lead['evidence'])) {
         <div class="card">
             <div class="card-head">
                 <h2>Contact</h2>
+                <a class="linkish small" href="<?= View::e(View::url(ltrim($leadUrl, '/') . '/edit')) ?>#f-decision_maker">Edit</a>
                 <?php if ($digStatus === 'running'): ?>
                     <span class="pill"><span class="spinner"></span> Digging…</span>
                 <?php elseif (\Prospector\Enrich::isThin($lead)): ?>

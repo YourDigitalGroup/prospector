@@ -931,6 +931,53 @@ final class Controller
      * field list and the rules; this only decides whose it is, where it hangs,
      * and where you go next.
      */
+    /**
+     * Edit a lead that already exists — the same form as adding one, filled in.
+     */
+    public static function leadEdit(int $id): void
+    {
+        self::requireLogin();
+
+        $lead = Leads::find($id);
+        if ($lead === null) {
+            self::notFound('That lead does not exist.');
+        }
+        if (!Auth::canAccessUser((int) $lead['user_id'])) {
+            self::forbidden();
+        }
+
+        $render = static function (array $values, array $errors) use ($lead): void {
+            View::page('leads_edit', [
+                'title' => 'Edit ' . (string) $lead['company'],
+                'lead' => $lead,
+                'groups' => LeadForm::editGroups(),
+                'values' => $values,
+                'errors' => $errors,
+            ]);
+        };
+
+        if (!Request::isPost()) {
+            $render(LeadForm::fromLead($lead), []);
+
+            return;
+        }
+
+        self::requireCsrf();
+
+        $values = LeadForm::read(static fn (string $field): string => Request::raw($field));
+        $result = Leads::edit($id, $values, Auth::id());
+
+        if (!$result['ok']) {
+            $render($values, $result['errors']);
+
+            return;
+        }
+
+        $count = count($result['changed']);
+        self::flash('success', $count === 0 ? 'Nothing had changed.' : 'Saved — ' . $count . ' ' . ($count === 1 ? 'field' : 'fields') . ' updated.');
+        self::redirect('/leads/' . $id);
+    }
+
     public static function leadsNew(): void
     {
         self::requireLogin();

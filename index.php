@@ -57,6 +57,9 @@ try {
 
         if ($action === '') {
             Controller::lead($id);
+        } elseif ($action === 'edit') {
+            // A form, so it answers GET as well as taking the POST.
+            Controller::leadEdit($id);
         } elseif ($method === 'POST') {
             Controller::leadAction($id, $action);
         } else {

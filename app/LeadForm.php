@@ -134,6 +134,59 @@ final class LeadForm
     }
 
     /**
+     * The groups for editing a lead that already exists.
+     *
+     * The same fields as adding one, less the status. A lead that exists has a
+     * disposition control of its own on its page, which writes the timeline
+     * and starts automations; a second way to set it here would either skip
+     * those or duplicate them.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function editGroups(): array
+    {
+        $groups = self::groups();
+        unset($groups['Where it stands']);
+
+        return $groups;
+    }
+
+    /**
+     * A stored lead as the form shows it — the reverse of validate().
+     *
+     * @param array<string, mixed> $lead
+     * @return array<string, string>
+     */
+    public static function fromLead(array $lead): array
+    {
+        $values = [];
+
+        foreach (self::fields() as $field) {
+            $values[$field] = trim((string) ($lead[$field] ?? ''));
+        }
+
+        // Stored as JSON, which can be a list of sources or a single string.
+        $evidence = json_decode((string) ($lead['evidence'] ?? ''), true);
+        $values['evidence'] = is_array($evidence)
+            ? implode(', ', array_map('strval', $evidence))
+            : (is_string($evidence) ? $evidence : $values['evidence']);
+
+        // Unscored is stored as 0. Showing a blank keeps it that way on save;
+        // showing "0" would read as a deliberate score of nothing.
+        if ((int) ($lead['fit_score'] ?? 0) === 0) {
+            $values['fit_score'] = '';
+        }
+
+        // The original wording of a bucketed vertical, so editing a lead never
+        // silently trades "Tribal gaming" for "Casino" in the detail.
+        if (!empty($lead['vertical_detail'])) {
+            $values['vertical'] = (string) $lead['vertical_detail'];
+        }
+
+        return $values;
+    }
+
+    /**
      * Every field on the form, in the order it appears.
      *
      * @return list<string>
