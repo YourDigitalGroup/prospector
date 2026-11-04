@@ -80,6 +80,27 @@ stays open three hours, a batch that already ran today is skipped, and a batch t
 retried by the next firing. That means the schedule never needs adjusting for daylight saving, and
 changing the delivery time under Settings needs no change anywhere else.
 
+### Sending email through Mailgun
+
+**Settings → Email delivery → How to send → Mailgun**, then the sending domain exactly as Mailgun lists
+it (e.g. `fourge.com`), the region it was created in, and an API key. A *sending key* for that domain
+is enough, and safer than the account's private key. **Send a test** at the bottom of the card proves
+it end to end.
+
+Every email Prospector sends goes that way once it is chosen: reminders, daily briefs, test emails.
+It uses Mailgun's HTTP API rather than its SMTP relay — one request, nothing for the host to block on
+port 587, and a refusal that says what was wrong (a bad key, or a domain the account does not have,
+usually because it was set up in the other region).
+
+Leave **From address** blank to send as `prospector@` the sending domain, or keep it on that domain.
+An address on another domain sent through this one is what gets filed as spam — which is the problem
+Mailgun is there to fix. Server mail, the default, is the usual reason email from shared hosting
+never arrives.
+
+The key is stored encrypted and never shown back. `PROSPECTOR_MAILGUN_BASE` redirects the API for the
+checks and, like the GoHighLevel one, is an environment variable on purpose: nothing typed on a
+screen can send the key anywhere else.
+
 ### When Anthropic refuses the key
 
 Every batch failing with `Anthropic API error 401 … authentication_error … invalid x-api-key` means
@@ -1002,6 +1023,7 @@ php tests/actions_verticals.php # canonical verticals, and logging what you did
 php tests/reminders.php         # reminder timing, sending, de-duplication, "contacted"
 php tests/lead_edit.php         # editing a lead: clearing, renaming, duplicates, who may
 php tests/anthropic_key.php     # a refused API key: checking, trimming, holding the schedule
+php tests/mailgun.php           # sending through Mailgun, against a stand-in for its API
 node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm install --no-save playwright)
 node tests/sticky_filters.js    # filters that survive leaving the page, until cleared
 node tests/followups.js         # reminders, Show contacted and sticky verticals, as Darren

@@ -408,10 +408,53 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
                             <option value="smtp" <?= ($settings['mail_transport'] ?? '') === 'smtp' ? 'selected' : '' ?>>
                                 SMTP (more reliable delivery)
                             </option>
+                            <option value="mailgun" <?= ($settings['mail_transport'] ?? '') === 'mailgun' ? 'selected' : '' ?>>
+                                Mailgun
+                            </option>
                         </select>
+                        <div class="hint">
+                            Server mail from shared hosting is often filed as spam or quietly dropped. If reminders or
+                            briefs are not arriving, send through Mailgun or a real mailbox over SMTP.
+                        </div>
                     </div>
 
-                    <fieldset>
+                    <?php /* Only the fields for the chosen way of sending are shown —
+                             app.js hides the others. Without JavaScript every set
+                             stays visible, which is untidy but still works. */ ?>
+                    <fieldset data-transport="mailgun">
+                        <legend class="small dim">Mailgun</legend>
+                        <div class="field-row">
+                            <div class="field">
+                                <label for="mailgun_domain">Sending domain</label>
+                                <input type="text" id="mailgun_domain" name="mailgun_domain"
+                                       value="<?= View::e($settings['mailgun_domain'] ?? '') ?>" placeholder="fourge.com"
+                                       autocomplete="off">
+                                <div class="hint">Exactly as it appears under Sending → Domains in Mailgun.</div>
+                            </div>
+                            <div class="field">
+                                <label for="mailgun_region">Region</label>
+                                <select id="mailgun_region" name="mailgun_region">
+                                    <option value="us" <?= ($settings['mailgun_region'] ?? 'us') !== 'eu' ? 'selected' : '' ?>>US</option>
+                                    <option value="eu" <?= ($settings['mailgun_region'] ?? '') === 'eu' ? 'selected' : '' ?>>EU</option>
+                                </select>
+                                <div class="hint">Where the domain was created. Most are US.</div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="mailgun_api_key">API key</label>
+                            <input type="password" id="mailgun_api_key" name="mailgun_api_key" autocomplete="new-password"
+                                   placeholder="<?= $secretSet('mailgun_api_key') ? 'Saved — type a new key to replace it' : 'key-… or a sending key' ?>">
+                            <div class="hint">
+                                A sending key for this domain (Sending → Domain settings → Sending keys) is enough, and
+                                safer than the account's private key. Stored encrypted. Leave the From address above
+                                blank to send as prospector@ the sending domain, or keep it on that same domain — an
+                                address on another domain sent through this one is what gets filed as spam.
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset data-transport="smtp">
+                        <legend class="small dim">SMTP</legend>
                         <div class="field-row">
                             <div class="field">
                                 <label for="smtp_host">SMTP host</label>

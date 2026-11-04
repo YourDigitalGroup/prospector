@@ -243,7 +243,10 @@ const reminderRow = (lead) => JSON.parse(php(
   // --------------------------------------------------------------- cleanup
 
   await browser.close();
-  php('Database::run("DELETE FROM leads"); Database::run("DELETE FROM reminders"); Database::run("UPDATE users SET lead_filters = NULL");');
+  php('Database::run("DELETE FROM leads"); Database::run("DELETE FROM reminders"); Database::run("UPDATE users SET lead_filters = NULL");'
+    // The batch record the seed leads hung off is left "running" otherwise, and
+    // an open batch stops the next suite starting one for the same person.
+    + ' Database::run("DELETE FROM runs WHERE vertical = \'Followups test\'");');
 
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
