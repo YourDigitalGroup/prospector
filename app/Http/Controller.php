@@ -1693,7 +1693,12 @@ final class Controller
         $values = [
             'mail_from_email' => Request::input('mail_from_email'),
             'mail_from_name' => Request::input('mail_from_name'),
-            'mail_transport' => Request::input('mail_transport') === 'smtp' ? 'smtp' : 'mail',
+            'mail_transport' => in_array(Request::input('mail_transport'), ['smtp', 'mailgun'], true)
+                ? Request::input('mail_transport') : 'mail',
+            // The sending domain as Mailgun names it. A pasted URL is cut down to
+            // the domain, since "https://fourge.com/" is not a domain Mailgun has.
+            'mailgun_domain' => strtolower(trim((string) preg_replace('#^https?://|/.*$#i', '', Request::input('mailgun_domain')))),
+            'mailgun_region' => Request::input('mailgun_region') === 'eu' ? 'eu' : 'us',
             'smtp_host' => Request::input('smtp_host'),
             'smtp_port' => (string) Request::int('smtp_port', 587),
             'smtp_secure' => Request::input('smtp_secure'),
@@ -1730,7 +1735,7 @@ final class Controller
         // often brings a trailing space or line break, and Anthropic rejects
         // the whole thing as invalid.
         $keyNotice = null;
-        foreach (['anthropic_api_key', 'smtp_password', 'ghl_token', 'local_model_key'] as $secret) {
+        foreach (['anthropic_api_key', 'smtp_password', 'ghl_token', 'local_model_key', 'mailgun_api_key'] as $secret) {
             $new = trim(Request::raw($secret));
             if ($new === '') {
                 continue;

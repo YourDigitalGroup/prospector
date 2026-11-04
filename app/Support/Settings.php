@@ -20,6 +20,7 @@ final class Settings
         'cron_token',
         'worker_token',
         'local_model_key',
+        'mailgun_api_key',
     ];
 
     private const DEFAULTS = [
@@ -32,6 +33,9 @@ final class Settings
         'smtp_secure' => 'tls',
         'smtp_username' => '',
         'smtp_password' => '',
+        'mailgun_api_key' => '',
+        'mailgun_domain' => '',
+        'mailgun_region' => 'us',
         'ghl_token' => '',
         'ghl_location_id' => '',
         'ghl_pipeline_id' => '',

@@ -80,6 +80,10 @@ final class Mailer
         }
         $fromName = Settings::get('mail_from_name', 'Prospector');
 
+        if (Settings::get('mail_transport') === 'mailgun') {
+            return self::sendViaMailgun($to, $toName, $subject, $html, $fromName);
+        }
+
         $mail = new PHPMailer(true);
 
         try {
@@ -130,6 +134,94 @@ final class Mailer
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Send through Mailgun's HTTP API.
+     *
+     * The API rather than Mailgun's SMTP relay: one request, no port 587 to be
+     * blocked by the host, and a reply that says what went wrong in words.
+     *
+     * The From address defaults to prospector@ the sending domain. Mail from an
+     * address on a domain Mailgun is not set up for is exactly the mail that
+     * lands in spam, which is the problem this transport exists to fix.
+     *
+     * PROSPECTOR_MAILGUN_BASE points it somewhere else for the checks, and is
+     * deliberately an environment variable rather than a setting: nothing a
+     * person can type on a screen should be able to send the API key elsewhere.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    private static function sendViaMailgun(string $to, string $toName, string $subject, string $html, string $fromName): array
+    {
+        $key = trim(Settings::get('mailgun_api_key'));
+        $domain = strtolower(trim(Settings::get('mailgun_domain')));
+
+        if ($key === '' || $domain === '') {
+            return ['ok' => false, 'message' => 'Mailgun is selected but its API key or sending domain is missing.'];
+        }
+
+        $fromEmail = trim(Settings::get('mail_from_email'));
+        if ($fromEmail === '') {
+            $fromEmail = 'prospector@' . $domain;
+        }
+
+        $override = getenv('PROSPECTOR_MAILGUN_BASE');
+        $base = is_string($override) && $override !== ''
+            ? rtrim($override, '/')
+            : (Settings::get('mailgun_region') === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net');
+
+        $handle = curl_init($base . '/v3/' . rawurlencode($domain) . '/messages');
+        curl_setopt_array($handle, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD => 'api:' . $key,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_POSTFIELDS => http_build_query([
+                'from' => self::mailbox($fromName, $fromEmail),
+                'to' => self::mailbox($toName, $to),
+                'subject' => self::oneLine($subject),
+                'html' => $html,
+                'text' => self::toPlainText($html),
+            ]),
+        ]);
+
+        $body = curl_exec($handle);
+        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        $error = curl_error($handle);
+        curl_close($handle);
+
+        if ($body === false) {
+            return ['ok' => false, 'message' => 'Could not reach Mailgun: ' . $error];
+        }
+
+        if ($status >= 200 && $status < 300) {
+            return ['ok' => true, 'message' => 'Sent to ' . $to . ' via Mailgun'];
+        }
+
+        $said = json_decode((string) $body, true);
+        $said = is_array($said) && isset($said['message']) ? (string) $said['message'] : trim(strip_tags((string) $body));
+
+        return ['ok' => false, 'message' => match (true) {
+            $status === 401 => 'Mailgun refused the API key. Use the domain\'s sending key or the account\'s private API key.',
+            $status === 404 => 'Mailgun has no sending domain called "' . $domain . '" on this account'
+                . (Settings::get('mailgun_region') === 'eu' ? ' in the EU region.' : ' in the US region — if the domain was set up in the EU, choose EU.'),
+            default => 'Mailgun said ' . $status . ': ' . mb_strimwidth($said, 0, 200, '…'),
+        }];
+    }
+
+    /** "Name <address>", with the name quoted and unable to start a new header. */
+    private static function mailbox(string $name, string $address): string
+    {
+        $name = trim(str_replace(['"', '\\'], '', self::oneLine($name)));
+
+        return $name === '' ? $address : '"' . $name . '" <' . $address . '>';
+    }
+
+    private static function oneLine(string $value): string
+    {
+        return trim(preg_replace('/[\r\n]+/', ' ', $value) ?? $value);
     }
 
     private static function toPlainText(string $html): string

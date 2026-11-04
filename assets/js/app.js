@@ -665,6 +665,20 @@
         }
     });
 
+    // ---- settings: show only the fields for the chosen way of sending ----
+    // Server mail needs nothing, SMTP needs a host and login, Mailgun a domain
+    // and key. Showing all three at once made it unclear which ones mattered.
+    var transport = document.getElementById('mail_transport');
+    if (transport) {
+        var showTransport = function () {
+            document.querySelectorAll('fieldset[data-transport]').forEach(function (set) {
+                set.hidden = set.getAttribute('data-transport') !== transport.value;
+            });
+        };
+        transport.addEventListener('change', showTransport);
+        showTransport();
+    }
+
     // ---- digging takes 20-40s, so say so rather than looking dead --------
     var digForm = document.querySelector('[data-dig-form]');
     if (digForm) {

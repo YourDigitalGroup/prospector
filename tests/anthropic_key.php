@@ -133,6 +133,7 @@ Settings::set('engine', 'api');
 $check(!Prospector::keyRefused(), 'nothing is held before anything has been refused');
 
 $result = Prospector::runFor($darren, 'test', false);
+echo "       batch said: " . mb_strimwidth($result["message"], 0, 220, "…") . "\n";
 $check(!$result['ok'] && str_contains($result['message'], 'invalid x-api-key'),
     'a batch with a revoked key fails the way it did in production');
 $check(Prospector::keyRefused(), 'and the refusal is remembered against that key');
