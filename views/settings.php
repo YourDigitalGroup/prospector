@@ -106,13 +106,33 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
             <div class="card">
                 <div class="card-head">
                     <h2>Anthropic API</h2>
-                    <?php if ($secretSet('anthropic_api_key') || $envKey): ?>
+                    <?php if (($secretSet('anthropic_api_key') || $envKey) && \Prospector\Prospector::keyRefused()): ?>
+                        <span class="pill"><span class="dot bad"></span> Refused by Anthropic</span>
+                    <?php elseif ($secretSet('anthropic_api_key') || $envKey): ?>
                         <span class="pill"><span class="dot ok"></span> Key set</span>
                     <?php else: ?>
                         <span class="pill"><span class="dot bad"></span> Missing</span>
                     <?php endif; ?>
                 </div>
                 <div class="card-body">
+                    <?php if (\Prospector\Prospector::keyRefused()): ?>
+                        <?php /* Said here, where the fix is, rather than only on a failed
+                                 batch somewhere else. */ ?>
+                        <div class="alert alert-error">
+                            <?php $name = 'alert'; $size = 16; require __DIR__ . '/partials/icon.php'; ?>
+                            <div>
+                                Anthropic refused this key on the last batch (<em>invalid x-api-key</em>), so
+                                scheduled batches are on hold. Paste a new key from
+                                <strong>console.anthropic.com → API keys</strong> below and save — it is checked
+                                with Anthropic before it is kept, and batches resume on their own.
+                                <?php if ($envKey): ?>
+                                    <br><strong>The key in use comes from the server's
+                                    <code>ANTHROPIC_API_KEY</code> environment variable</strong>, which overrides
+                                    this screen — that is the one to replace.
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                     <?php if ($envKey): ?>
                         <div class="alert alert-info">
                             <?php $name = 'check'; $size = 16; require __DIR__ . '/partials/icon.php'; ?>

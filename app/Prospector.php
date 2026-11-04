@@ -140,8 +140,37 @@ final class Prospector
         } catch (\Throwable $e) {
             Runs::fail($runId, $e->getMessage());
 
+            // Anthropic refusing the key is the one failure that retrying cannot
+            // fix. Remember which key it refused, so the schedule stops trying
+            // it every ping — and starts again by itself once the key changes.
+            if (Claude::isKeyRejection($e)) {
+                Settings::set('anthropic_key_rejected', self::keyFingerprint());
+            }
+
             return self::failure($runId, 0, 0, $e->getMessage());
         }
+    }
+
+    /**
+     * A fingerprint of the key in use, so a refusal can be tied to that key
+     * without the key itself being written anywhere it was not already.
+     */
+    public static function keyFingerprint(): string
+    {
+        return hash('sha256', Settings::anthropicKey());
+    }
+
+    /**
+     * Has Anthropic refused the key that is configured right now?
+     *
+     * True only for the same key: a new one, entered in Settings or set on the
+     * server, lifts it without anybody having to remember to.
+     */
+    public static function keyRefused(): bool
+    {
+        $refused = Settings::get('anthropic_key_rejected');
+
+        return $refused !== '' && hash_equals($refused, self::keyFingerprint());
     }
 
     /**
@@ -162,6 +191,17 @@ final class Prospector
                 'message' => $engine === 'worker'
                     ? 'Engine is set to the external worker, which pulls its own assignment. Nothing to do here.'
                     : 'Engine is set to manual paste-in. Nothing runs on a schedule.',
+            ]];
+        }
+
+        // Every batch would fail the same way and record another failure; one
+        // clear message is more use than a column of identical ones.
+        if (self::keyRefused()) {
+            return [[
+                'user' => 'all',
+                'ok' => false,
+                'message' => 'Anthropic refused the API key on the last batch, so no batch is attempted until '
+                    . 'the key is replaced under Settings → Anthropic API.',
             ]];
         }
 

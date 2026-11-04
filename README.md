@@ -80,6 +80,28 @@ stays open three hours, a batch that already ran today is skipped, and a batch t
 retried by the next firing. That means the schedule never needs adjusting for daylight saving, and
 changing the delivery time under Settings needs no change anywhere else.
 
+### When Anthropic refuses the key
+
+Every batch failing with `Anthropic API error 401 … authentication_error … invalid x-api-key` means
+Anthropic does not recognise the key Prospector is sending: it was deleted or rotated in the Anthropic
+console, belongs to a disabled workspace, or was copied incompletely. Prospector cannot fix that — a
+new key from **console.anthropic.com → API keys** can.
+
+What Prospector does about it:
+
+- **The schedule stops retrying.** A refused key cannot start working by itself, so after one refusal
+  no scheduled batch is attempted with that key — rather than a fresh failure per seller every ping.
+  The cron webhook answers with an error instead, so the scheduler shows red. Reminders and approved
+  outreach still go out; only research is held.
+- **Settings says so.** The Anthropic card reads *Refused by Anthropic* rather than *Key set*.
+- **A new key is checked before it is kept.** Pasting one and saving asks Anthropic first, with a free
+  call; one it refuses is not saved. Saving one it accepts lifts the hold by itself.
+- **Keys are trimmed**, saved and read, so a trailing space or line break from copying can never be
+  the cause.
+
+If the settings screen says the key comes from an `ANTHROPIC_API_KEY` environment variable, that
+overrides the screen, and it is the one to replace — on the server.
+
 ### Using MySQL instead
 
 SQLite is the default because it needs no setup. To use a cPanel MySQL database instead, create
@@ -979,6 +1001,7 @@ php tests/export_names.php      # splitting a name, and the export columns built
 php tests/actions_verticals.php # canonical verticals, and logging what you did
 php tests/reminders.php         # reminder timing, sending, de-duplication, "contacted"
 php tests/lead_edit.php         # editing a lead: clearing, renaming, duplicates, who may
+php tests/anthropic_key.php     # a refused API key: checking, trimming, holding the schedule
 node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm install --no-save playwright)
 node tests/sticky_filters.js    # filters that survive leaving the page, until cleared
 node tests/followups.js         # reminders, Show contacted and sticky verticals, as Darren

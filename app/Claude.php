@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Prospector;
 
 use Anthropic\Client;
+use Anthropic\Core\Exceptions\AuthenticationException;
+use Anthropic\Core\Exceptions\PermissionDeniedException;
 use Anthropic\Core\Exceptions\APIStatusException;
 use Anthropic\Messages\Message;
 use Anthropic\Messages\TextBlock;
@@ -43,6 +45,55 @@ final class Claude
     public function model(): string
     {
         return $this->model;
+    }
+
+    /**
+     * Ask Anthropic whether a key is good, without spending anything.
+     *
+     * Listing models is free and needs a valid key, so it answers exactly the
+     * question "would a batch get past authentication" and nothing else. Three
+     * outcomes, because they call for different things: accepted; rejected,
+     * which no amount of retrying will fix; or not reachable right now, which
+     * says nothing about the key either way.
+     *
+     * @return array{ok: bool, rejected: bool, message: string}
+     */
+    public static function checkKey(string $key): array
+    {
+        $key = trim($key);
+
+        if ($key === '') {
+            return ['ok' => false, 'rejected' => true, 'message' => 'There is no key to check.'];
+        }
+
+        try {
+            (new Client(apiKey: $key))->models->list(limit: 1);
+
+            return ['ok' => true, 'rejected' => false, 'message' => 'Anthropic accepted the key.'];
+        } catch (AuthenticationException) {
+            return ['ok' => false, 'rejected' => true, 'message' =>
+                'Anthropic rejected the key (invalid x-api-key). It may have been deleted or rotated in the '
+                . 'Anthropic console, or copied incompletely. Create a new one at console.anthropic.com.'];
+        } catch (PermissionDeniedException $e) {
+            return ['ok' => false, 'rejected' => true, 'message' =>
+                'Anthropic recognised the key but refused it access — the account or workspace it belongs '
+                . 'to may be disabled, or out of credit.'];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'rejected' => false, 'message' =>
+                'Could not reach Anthropic to check the key: ' . mb_strimwidth($e->getMessage(), 0, 160, '…')];
+        }
+    }
+
+    /** Was this failure Anthropic refusing the key, rather than anything transient? */
+    public static function isKeyRejection(\Throwable $e): bool
+    {
+        for ($at = $e; $at !== null; $at = $at->getPrevious()) {
+            if ($at instanceof AuthenticationException || $at instanceof PermissionDeniedException) {
+                return true;
+            }
+        }
+
+        return $e->getCode() === 401 || $e->getCode() === 403;
     }
 
     /**

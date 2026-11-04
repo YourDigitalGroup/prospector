@@ -1688,7 +1688,7 @@ final class Controller
         ]);
     }
 
-    private static function saveSettings(): void
+    private static function saveSettings(): ?array
     {
         $values = [
             'mail_from_email' => Request::input('mail_from_email'),
@@ -1726,12 +1726,32 @@ final class Controller
         ];
 
         // Secrets are only written when a new value is typed, so an empty field
-        // never wipes a working credential.
+        // never wipes a working credential. Trimmed: a key copied from a console
+        // often brings a trailing space or line break, and Anthropic rejects
+        // the whole thing as invalid.
+        $keyNotice = null;
         foreach (['anthropic_api_key', 'smtp_password', 'ghl_token', 'local_model_key'] as $secret) {
-            $new = Request::raw($secret);
-            if ($new !== '') {
-                $values[$secret] = $new;
+            $new = trim(Request::raw($secret));
+            if ($new === '') {
+                continue;
             }
+
+            // A new Anthropic key is checked before it replaces the old one. One
+            // Anthropic refuses is not saved — it could only ever fail, and it
+            // would do so at 7:30 tomorrow, unattended, for every seller.
+            if ($secret === 'anthropic_api_key') {
+                $check = Claude::checkKey($new);
+                if ($check['rejected']) {
+                    $keyNotice = ['error', 'That key was not saved. ' . $check['message']];
+                    continue;
+                }
+                $keyNotice = $check['ok']
+                    ? ['success', 'Settings saved. Anthropic accepted the new key.']
+                    : ['success', 'Settings saved. ' . $check['message'] . ' — it will be checked on the next batch.'];
+                Settings::forget('anthropic_key_rejected');
+            }
+
+            $values[$secret] = $new;
         }
 
         if (Request::bool('clear_ghl_token')) {
@@ -1739,7 +1759,9 @@ final class Controller
         }
 
         Settings::setMany($values);
-        self::flash('success', 'Settings saved.');
+        self::flash($keyNotice[0] ?? 'success', $keyNotice[1] ?? 'Settings saved.');
+
+        return $keyNotice;
     }
 
     public static function settingsTest(string $what): void
@@ -1754,7 +1776,13 @@ final class Controller
         // whatever was just typed. Save it before testing — otherwise pasting a
         // key and pressing Test would check the previous one.
         if (Request::input('run_hour') !== '') {
-            self::saveSettings();
+            $notice = self::saveSettings();
+
+            // A key that was just refused was not saved, so testing now would
+            // test the old one and hide the refusal behind its result.
+            if (($notice[0] ?? '') === 'error') {
+                self::redirect('/settings');
+            }
         }
 
         switch ($what) {
@@ -1763,6 +1791,16 @@ final class Controller
                     $result = (new Claude(Settings::get('model', 'claude-opus-5')))->testConnection();
                 } catch (\Throwable $e) {
                     $result = ['ok' => false, 'message' => $e->getMessage()];
+                }
+
+                // A key that works lifts the hold on scheduled batches; one that
+                // does not, and comes from the server's environment, says so —
+                // replacing it in Settings would change nothing.
+                if ($result['ok']) {
+                    Settings::forget('anthropic_key_rejected');
+                } elseif (Settings::anthropicKeySource() === 'environment') {
+                    $result['message'] .= ' This is the key from the server\'s ANTHROPIC_API_KEY environment variable,'
+                        . ' which overrides the one saved here — it has to be changed on the server.';
                 }
                 break;
 
