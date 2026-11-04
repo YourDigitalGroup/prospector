@@ -93,7 +93,33 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def _refused_key(self):
+        """
+        A key that has been deleted or rotated in the Anthropic console. Any key
+        containing "revoked" stands in for one, and gets back exactly what the
+        real API sends: a 401 whose error type is authentication_error and whose
+        message is "invalid x-api-key" — the response that took every batch
+        down when the schedule first ran for real.
+        """
+        key = self.headers.get("x-api-key") or ""
+        if "revoked" in key:
+            self._send(401, {"type": "error", "error": {
+                "type": "authentication_error", "message": "invalid x-api-key"}})
+            return True
+        return False
+
     def do_GET(self):
+        # GET /v1/models — free, needs a valid key, which is why Prospector uses
+        # it to check a key before saving it.
+        if self.path.startswith("/v1/models"):
+            if self._refused_key():
+                return None
+            return self._send(200, {"data": [{"type": "model", "id": "claude-opus-5",
+                                              "display_name": "Claude Opus 5",
+                                              "created_at": "2026-01-01T00:00:00Z"}],
+                                    "has_more": False, "first_id": "claude-opus-5",
+                                    "last_id": "claude-opus-5"})
+
         if self.path.startswith("/__control"):
             mode = re.search(r"fail=([a-z0-9]+)", self.path)
             STATE["fail"] = None if not mode or mode.group(1) == "off" else mode.group(1)
@@ -172,6 +198,9 @@ class Handler(BaseHTTPRequestHandler):
         # without one, so this catches the case where that stops being true.
         if not self.headers.get("x-api-key") and not self.headers.get("authorization"):
             return self._send(401, {"type": "error", "error": {"message": "no api key"}})
+
+        if self._refused_key():
+            return None
 
         mode = STATE["fail"]
         STATE["fail"] = None  # one-shot

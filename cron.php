@@ -170,6 +170,17 @@ if (Settings::anthropicKey() === '') {
     exit;
 }
 
+// Anthropic refused this exact key on an earlier batch. Trying again every ping
+// would only add another identical failure per seller; a new key lifts it.
+if (Prospector::keyRefused()) {
+    http_response_code(500);
+    $lines[] = 'ERROR: Anthropic refused the API key on the last batch. No batch is attempted until it is '
+        . 'replaced under Settings → Anthropic API.';
+    Background::log('Cron held: Anthropic refused the API key.');
+    echo implode("\n", $lines) . "\n";
+    exit;
+}
+
 // Decide up front who is in scope so the acknowledgement is informative.
 if ($userId > 0) {
     $user = Users::find($userId);

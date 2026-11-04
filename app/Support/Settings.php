@@ -192,14 +192,28 @@ final class Settings
     }
 
     /** The Anthropic key may also come from the environment on hosts that support it. */
+    /**
+     * Trimmed on the way out as well as on the way in: a key pasted with a
+     * trailing space or line break — easy to do copying from the console — is
+     * rejected by Anthropic as invalid, and one saved that way before saving
+     * trimmed would otherwise go on failing until somebody noticed why.
+     */
     public static function anthropicKey(): string
     {
         $env = getenv('ANTHROPIC_API_KEY');
-        if (is_string($env) && $env !== '') {
-            return $env;
+        if (is_string($env) && trim($env) !== '') {
+            return trim($env);
         }
 
-        return self::get('anthropic_api_key');
+        return trim(self::get('anthropic_api_key'));
+    }
+
+    /** Where the key in use comes from, for saying so on the settings screen. */
+    public static function anthropicKeySource(): string
+    {
+        $env = getenv('ANTHROPIC_API_KEY');
+
+        return is_string($env) && trim($env) !== '' ? 'environment' : 'settings';
     }
 
     /**

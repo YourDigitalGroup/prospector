@@ -184,6 +184,11 @@ if (Settings::anthropicKey() === '') {
     exit(1);
 }
 
+if (Prospector::keyRefused()) {
+    $say('ERROR: Anthropic refused the API key on the last batch. Replace it under Settings → Anthropic API.');
+    exit(1);
+}
+
 Background::extendLimits(3600);
 
 foreach ($users as $user) {
