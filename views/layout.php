@@ -98,7 +98,23 @@ $active = static function (string $path) use ($currentPath): bool {
 <?php /* The upload endpoint as an absolute URL, because the app can be
          installed in a subdirectory and a relative fetch from /leads/12 would
          go to /leads/attachments. */ ?>
-<body data-attach-endpoint="<?= View::e(View::url('attachments')) ?>">
+<?php $viewer = Auth::viewer(); ?>
+<body data-attach-endpoint="<?= View::e(View::url('attachments')) ?>"<?= $viewer !== null ? ' class="is-viewing-as"' : '' ?>>
+<?php if ($viewer !== null): ?>
+    <?php /* Fixed to the bottom of the window so it is on every screen and at
+             every scroll position — the one thing that must not be missed is
+             whose eyes you are looking through. */ ?>
+    <div class="view-as-bar" role="status">
+        <span class="view-as-eye"><?php $name = 'eye'; $size = 15; require __DIR__ . '/partials/icon.php'; ?></span>
+        <span class="view-as-text">
+            Viewing as <strong><?= View::e($user['name'] ?? '') ?></strong><span class="view-as-long"> · read-only, nothing you do is saved</span>
+        </span>
+        <form method="post" action="<?= View::e(View::url('view-as/stop')) ?>">
+            <input type="hidden" name="csrf" value="<?= View::e($csrf ?? '') ?>">
+            <button type="submit" class="view-as-back">Back to <?= View::e($viewer['name']) ?></button>
+        </form>
+    </div>
+<?php endif; ?>
 <div class="shell">
     <aside class="sidebar" data-collapsed="true">
         <div class="brand">
