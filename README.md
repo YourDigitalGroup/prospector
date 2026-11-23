@@ -439,6 +439,23 @@ Adding another person is a Users-screen job: name, email, pick a loop, done. A n
 spec in `app/loops/`, an entry in `Users::LOOPS` and `Users::RUNNABLE_LOOPS`, and a rotation in
 `Runs` — see the `home` loop for the shape of it.
 
+### Viewing as someone else
+
+To see exactly what Billy or Darren sees, go to **Users** and press **View as**
+next to their name. You land on their Home with their leads, counts,
+remembered filters and GoHighLevel account. The admin screens are hidden, as
+they are for them. A red bar along the bottom of every screen says whose view
+you are in, and **Back to Scott** returns you to your own.
+
+It is read-only. Anything done from their view would be recorded under their
+name — a call logged as Darren's that he never made, a reminder landing in his
+inbox — so every save is refused with a note saying why. Looking quietly
+changes nothing either: opening one of their leads does not mark it opened,
+filtering does not replace the filters they come back to, and their "last
+seen" time is untouched. Admins cannot be viewed as, since they already see
+everything. If the person is disabled while you are looking, you are put back
+in your own view; if you stop being an admin, you are signed out.
+
 ---
 
 ## How a batch works
@@ -1074,6 +1091,7 @@ node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm ins
 node tests/sticky_filters.js    # filters that survive leaving the page, until cleared
 node tests/followups.js         # reminders, Show contacted and sticky verticals, as Darren
 node tests/home.js              # Home worked like a seller works it, phone and reduced motion included
+node tests/view_as.js           # an admin viewing as Darren: his view, read-only, and the way back
 ```
 
 `bulk_bar.js` is the odd one out, in JavaScript, because what it guards against lived in

@@ -41,6 +41,9 @@ if (Auth::check()) {
     \Prospector\Reminders::sweepAfterResponse();
 }
 
+// An admin viewing as someone else can look but not change anything.
+Controller::blockWritesWhileViewingAs($method, $path);
+
 View::share([
     'currentPath' => $path,
     'currentUser' => Auth::user(),
@@ -139,6 +142,8 @@ try {
         $path === '/users' => Controller::users(),
         $path === '/users/save' && $method === 'POST' => Controller::usersSave(),
         $path === '/users/delete' && $method === 'POST' => Controller::usersDelete(),
+        $path === '/users/view-as' && $method === 'POST' => Controller::usersViewAs(),
+        $path === '/view-as/stop' && $method === 'POST' => Controller::stopViewingAs(),
 
         default => Controller::notFound(),
     };

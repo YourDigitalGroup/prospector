@@ -79,6 +79,16 @@ use Prospector\Users;
                         </td>
                         <td class="nowrap small muted"><?= View::e(Clock::relative($user['last_login_at'] ?? null)) ?></td>
                         <td class="right nowrap">
+                            <?php if (Auth::cannotViewAs((int) $user['id']) === null): ?>
+                                <form method="post" action="<?= View::e(View::url('users/view-as')) ?>" class="inline-form">
+                                    <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
+                                    <button type="submit" class="btn btn-sm" data-view-as
+                                            title="See Prospector exactly as <?= View::e($user['name']) ?> does. Read-only.">
+                                        View as
+                                    </button>
+                                </form>
+                            <?php endif; ?>
                             <a class="btn btn-sm" href="#user-<?= (int) $user['id'] ?>">Edit</a>
                         </td>
                     </tr>

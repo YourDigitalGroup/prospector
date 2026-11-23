@@ -2089,3 +2089,64 @@ input[type="file"] {
 @media (prefers-reduced-motion: reduce) {
     .dash *, .dash *::before { animation: none !important; transition: none !important; }
 }
+
+
+/* ------------------------------------------------------------- view as */
+
+/* An admin seeing Prospector as someone else. A bar that floats over the
+   bottom of every screen, in the colour of nothing else in the app, so it is
+   never mistaken for one of that person's own notices. */
+body.is-viewing-as { padding-bottom: 76px; }
+
+.view-as-bar {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: calc(100vw - 32px);
+    padding: 8px 8px 8px 14px;
+    border-radius: 999px;
+    background: #ff004c;
+    color: #fff;
+    font-size: 13.5px;
+    box-shadow: 0 10px 30px rgba(255, 0, 76, .35), 0 2px 6px rgba(0, 0, 0, .25);
+    animation: view-as-in .35s cubic-bezier(.2, .9, .3, 1.2);
+}
+
+.view-as-bar form { margin: 0; flex-shrink: 0; }
+.view-as-eye { display: inline-flex; flex-shrink: 0; }
+.view-as-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.view-as-back {
+    border: 0;
+    border-radius: 999px;
+    padding: 7px 14px;
+    background: #fff;
+    color: #c4003a;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.view-as-back:hover { background: #ffe5ed; }
+.view-as-back:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+@keyframes view-as-in {
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 640px) {
+    .view-as-long { display: none; }
+    .view-as-bar { left: 16px; right: 16px; transform: none; max-width: none; animation: none; }
+    .view-as-text { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .view-as-bar { animation: none; }
+}

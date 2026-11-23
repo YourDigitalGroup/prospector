@@ -226,6 +226,7 @@ final class Auth
         }
         session_destroy();
         self::$user = null;
+        self::$viewer = null;
     }
 
     /** @return array<string, mixed>|null */
@@ -243,12 +244,126 @@ final class Auth
 
         $user = Users::find($id);
         if ($user === null || (int) $user['active'] !== 1) {
+            // The person being viewed was disabled or deleted mid-look: hand the
+            // admin back their own account rather than signing them out.
+            if (isset($_SESSION[self::VIEWER_KEY])) {
+                self::stopViewingAs();
+
+                return self::user();
+            }
+
             self::logout();
 
             return null;
         }
 
+        // An admin looking through someone else's eyes. Checked every request,
+        // so taking admin away from the person doing the looking (or disabling
+        // them) ends it at once instead of whenever they next click "back".
+        if (isset($_SESSION[self::VIEWER_KEY])) {
+            $viewer = Users::find((int) $_SESSION[self::VIEWER_KEY]);
+            if ($viewer === null || (int) $viewer['active'] !== 1 || (string) $viewer['role'] !== 'admin') {
+                self::logout();
+
+                return null;
+            }
+            self::$viewer = $viewer;
+        }
+
         return self::$user = $user;
+    }
+
+    // ------------------------------------------------------------ view as
+
+    /**
+     * Where the real, signed-in admin is kept while they view as someone else.
+     * user_id holds the person being viewed, so every screen, count and scope
+     * already behaves exactly as it does for them.
+     */
+    private const VIEWER_KEY = 'viewing_as_by';
+
+    /** @var array<string, mixed>|null */
+    private static ?array $viewer = null;
+
+    /**
+     * Why $targetId cannot be viewed as, or null when they can.
+     *
+     * Admins are left out: an admin already sees everything, and viewing as
+     * one would only be a way to borrow their name.
+     */
+    public static function cannotViewAs(int $targetId): ?string
+    {
+        if (!self::isAdmin() || self::isViewingAs()) {
+            return 'Only an admin can view as someone else.';
+        }
+        if ($targetId === self::id()) {
+            return 'That is you.';
+        }
+
+        $target = Users::find($targetId);
+        if ($target === null) {
+            return 'No such user.';
+        }
+        if ((int) $target['active'] !== 1) {
+            return $target['name'] . ' is disabled.';
+        }
+        if ((string) $target['role'] === 'admin') {
+            return $target['name'] . ' is an admin and already sees everything.';
+        }
+
+        return null;
+    }
+
+    public static function viewAs(int $targetId): bool
+    {
+        if (self::cannotViewAs($targetId) !== null) {
+            return false;
+        }
+
+        $adminId = self::id();
+        session_regenerate_id(true);
+        $_SESSION[self::VIEWER_KEY] = $adminId;
+        $_SESSION['user_id'] = $targetId;
+        // Their remembered page, not the admin's.
+        unset($_SESSION['intended']);
+        self::$user = null;
+        self::$viewer = null;
+
+        return self::user() !== null;
+    }
+
+    public static function stopViewingAs(): void
+    {
+        self::start();
+        $adminId = (int) ($_SESSION[self::VIEWER_KEY] ?? 0);
+        if ($adminId === 0) {
+            return;
+        }
+
+        session_regenerate_id(true);
+        unset($_SESSION[self::VIEWER_KEY]);
+        $_SESSION['user_id'] = $adminId;
+        self::$user = null;
+        self::$viewer = null;
+    }
+
+    public static function isViewingAs(): bool
+    {
+        self::user();
+
+        return self::$viewer !== null;
+    }
+
+    /**
+     * The admin behind the screen while viewing as someone else.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function viewer(): ?array
+    {
+        self::user();
+
+        return self::$viewer;
     }
 
     public static function id(): int

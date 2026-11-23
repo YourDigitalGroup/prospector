@@ -265,13 +265,22 @@ final class Controller
             return;
         }
 
+        // Viewing as someone shows their remembered filters but never changes
+        // them: what Darren comes back to should be what he left.
+        $readOnly = Auth::isViewingAs();
+
         if (Request::input('clear') === '1') {
+            if ($readOnly) {
+                self::redirect('/leads?f=0');
+            }
             Users::clearLeadFilters($userId);
             self::redirect('/leads');
         }
 
         if (Request::input('f') === '1') {
-            Users::saveLeadFilters($userId, $_GET);
+            if (!$readOnly) {
+                Users::saveLeadFilters($userId, $_GET);
+            }
 
             return;
         }
@@ -346,7 +355,10 @@ final class Controller
 
         // Opening a lead is what marks it opened. Only for its owner — see the
         // note on markOpened.
-        Leads::markOpened($id, Auth::id());
+        // Not when an admin is viewing as the owner: they have not seen it.
+        if (!Auth::isViewingAs()) {
+            Leads::markOpened($id, Auth::id());
+        }
 
         self::renderLead($lead);
     }
@@ -2041,6 +2053,74 @@ final class Controller
         Users::delete($id);
         self::flash('success', $user['name'] . ' and their leads were removed.');
         self::redirect('/users');
+    }
+
+    /**
+     * See Prospector exactly as one of the team does: their Home, their leads,
+     * their counts, their GoHighLevel account. Read-only — see
+     * blockWritesWhileViewingAs().
+     */
+    public static function usersViewAs(): void
+    {
+        self::requireLogin();
+        self::requireCsrf();
+
+        $id = Request::int('id');
+        $reason = Auth::cannotViewAs($id);
+        if ($reason !== null || !Auth::viewAs($id)) {
+            self::flash('error', $reason ?? 'Could not switch to that view.');
+            self::redirect('/users');
+        }
+
+        self::redirect('/dashboard');
+    }
+
+    public static function stopViewingAs(): void
+    {
+        self::requireCsrf();
+
+        if (!Auth::isViewingAs()) {
+            self::redirect('/dashboard');
+        }
+
+        $name = (string) (Auth::user()['name'] ?? '');
+        Auth::stopViewingAs();
+        if ($name !== '') {
+            self::flash('success', 'Back to your own view. You were viewing as ' . $name . '.');
+        }
+
+        self::redirect('/users');
+    }
+
+    /**
+     * While an admin views as someone, nothing is saved.
+     *
+     * Anything changed from that view would be recorded under the other
+     * person's name — a call logged as Darren's that Darren never made, a
+     * reminder set in his inbox — and that is worse than having to switch
+     * back to do it. So every POST except the way out is turned away here,
+     * once, rather than trusted to each handler.
+     */
+    public static function blockWritesWhileViewingAs(string $method, string $path): void
+    {
+        if ($method !== 'POST' || $path === '/view-as/stop' || !Auth::isViewingAs()) {
+            return;
+        }
+
+        $name = (string) (Auth::user()['name'] ?? 'them');
+        $message = 'You are viewing as ' . $name . ', so nothing can be changed. Switch back to make changes.';
+
+        if (Request::wantsJson()) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => false, 'message' => $message]);
+            exit;
+        }
+
+        self::flash('error', $message);
+        $back = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+        $self = rtrim(View::baseUrl(), '/') . '/';
+        self::redirect($back !== '' && str_starts_with($back, $self) ? $back : '/dashboard');
     }
 
     // ------------------------------------------------------------ helpers
