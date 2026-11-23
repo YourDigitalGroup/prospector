@@ -82,6 +82,7 @@ try {
         $path === '/logout' => Controller::logout(),
 
         $path === '/dashboard' => Controller::dashboard(),
+        $path === '/dashboard/act' && $method === 'POST' => Controller::dashboardAct(),
 
         $path === '/leads' => Controller::leads(),
         $path === '/leads/export' => Controller::leadsExport(),

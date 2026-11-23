@@ -679,6 +679,198 @@
         showTransport();
     }
 
+    // ---- Home: the sales dashboard --------------------------------------
+    // Counts the week's numbers up, and works the queue without leaving the
+    // page: log a call, take the suggested follow-up, and the row slides away
+    // while the scoreboard moves. Every button is a real form underneath, so
+    // without this the page still works by posting and coming back.
+    var dash = document.querySelector('[data-dash]');
+    if (dash) {
+        var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        var countUp = function (el, to) {
+            var from = parseInt(el.textContent, 10) || 0;
+            if (still || from === to) { el.textContent = to; return; }
+            var start = null;
+            var span = Math.min(1100, 500 + Math.abs(to - from) * 40);
+            var step = function (t) {
+                if (start === null) start = t;
+                var k = Math.min(1, (t - start) / span);
+                var eased = 1 - Math.pow(1 - k, 3);
+                el.textContent = Math.round(from + (to - from) * eased);
+                if (k < 1) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
+        };
+
+        // On arrival everything counts up from nothing, a beat after the cards
+        // have slid in.
+        dash.querySelectorAll('[data-count]').forEach(function (el) {
+            var to = parseInt(el.getAttribute('data-count'), 10) || 0;
+            if (still) return;
+            el.textContent = '0';
+            setTimeout(function () { countUp(el, to); }, 350);
+        });
+
+        var toastEl = dash.querySelector('[data-toast]');
+        var toastTimer = null;
+        var toast = function (message, isError) {
+            if (!toastEl) return;
+            toastEl.textContent = message;
+            toastEl.classList.toggle('is-error', !!isError);
+            toastEl.hidden = false;
+            // Restart the entrance even when one toast follows another.
+            toastEl.style.animation = 'none';
+            void toastEl.offsetWidth;
+            toastEl.style.animation = '';
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(function () { toastEl.hidden = true; }, 3200);
+        };
+
+        var bump = function (el) {
+            el.classList.remove('is-bumped');
+            void el.offsetWidth;
+            el.classList.add('is-bumped');
+        };
+
+        // The week's numbers, as the server now has them.
+        var applyScore = function (score) {
+            if (!score || !score.this) return;
+            Object.keys(score.this).forEach(function (key) {
+                dash.querySelectorAll('[data-score="' + key + '"]').forEach(function (el) {
+                    var to = score.this[key];
+                    if ((parseInt(el.textContent, 10) || 0) !== to) { countUp(el, to); bump(el); }
+                });
+                var delta = dash.querySelector('[data-delta="' + key + '"]');
+                if (delta) {
+                    var diff = score.this[key] - (score.last ? score.last[key] : 0);
+                    delta.className = 'dash-delta ' + (diff > 0 ? 'is-up' : (diff < 0 ? 'is-down' : 'is-flat'));
+                    delta.textContent = diff > 0 ? '▲ ' + diff + ' vs last week'
+                        : (diff < 0 ? '▼ ' + Math.abs(diff) + ' vs last week' : 'Same as last week');
+                }
+            });
+
+            var ring = dash.querySelector('[data-ring]');
+            if (ring) ring.style.setProperty('--p', Math.min(100, Math.round(score.this.touches / Math.max(1, score.goal) * 100)));
+            var left = dash.querySelector('[data-score-left]');
+            if (left) left.textContent = Math.max(0, score.goal - score.this.touches);
+
+            var bar = dash.querySelector('[data-today-bar]');
+            if (bar && score.days) {
+                score.days.forEach(function (day) {
+                    if (day.today) {
+                        var peak = Math.max(parseInt(bar.getAttribute('data-peak'), 10) || 1, day.count);
+                        bar.style.setProperty('--h', Math.round(day.count / peak * 100) + '%');
+                    }
+                });
+            }
+        };
+
+        // Take a handled row out, and keep the counts and empty states honest.
+        var removeRow = function (row) {
+            var section = row.closest('[data-section]');
+            row.style.height = row.offsetHeight + 'px';
+            void row.offsetWidth;
+            row.classList.add('is-leaving');
+
+            setTimeout(function () {
+                row.remove();
+                if (section) {
+                    var left = section.querySelectorAll('.q-row').length;
+                    var count = section.querySelector('[data-section-count]');
+                    if (count) count.textContent = left;
+                    // The next hidden row steps up to keep five showing.
+                    var extra = section.querySelector('.q-row.is-extra');
+                    if (extra && section.querySelectorAll('.q-row:not(.is-extra)').length < 5) extra.classList.remove('is-extra');
+                    if (left === 0) section.remove();
+                }
+
+                var total = dash.querySelectorAll('.q-row').length;
+                var pill = dash.querySelector('[data-queue-total]');
+                if (pill) pill.textContent = total;
+                var todo = dash.querySelector('[data-todo-count]');
+                if (todo) todo.textContent = dash.querySelectorAll('[data-section="due"] .q-row, [data-section="stalled"] .q-row, [data-section="cold"] .q-row').length;
+                var empty = dash.querySelector('[data-queue-empty]');
+                if (empty && total === 0) empty.hidden = false;
+            }, 380);
+        };
+
+        var send = function (form, extra) {
+            var data = new FormData(form);
+            Object.keys(extra || {}).forEach(function (key) { data.set(key, extra[key]); });
+            return fetch(form.action, {
+                method: 'POST',
+                body: data,
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            }).then(function (response) {
+                return response.json().catch(function () { return { ok: false, message: 'Something went wrong — try again.' }; });
+            });
+        };
+
+        dash.addEventListener('submit', function (event) {
+            var form = event.target;
+            if (!form.classList || !form.classList.contains('q-form')) return;
+            event.preventDefault();
+
+            var row = form.closest('.q-row');
+            var pressed = event.submitter;
+            var extra = {};
+            if (pressed && pressed.name) extra[pressed.name] = pressed.value;
+
+            row.querySelectorAll('.q-btn').forEach(function (b) { b.disabled = true; });
+
+            send(form, extra).then(function (reply) {
+                if (!reply.ok) {
+                    toast(reply.message, true);
+                    row.querySelectorAll('.q-btn').forEach(function (b) { b.disabled = false; });
+                    return;
+                }
+
+                applyScore(reply.score);
+                row.classList.add('is-done');
+
+                // Logged an action that calls for a follow-up: offer it, in
+                // place of the buttons, before the row goes.
+                if (reply.suggest) {
+                    var actions = row.querySelector('.q-actions');
+                    var prompt = document.createElement('div');
+                    prompt.className = 'q-prompt';
+                    prompt.innerHTML = '<span>Follow up <strong></strong>?</span>'
+                        + '<button type="button" class="q-btn" data-yes>Yes, remind me</button>'
+                        + '<button type="button" class="q-btn q-quiet" data-no>Not now</button>';
+                    prompt.querySelector('strong').textContent = reply.suggest.label;
+                    actions.innerHTML = '';
+                    actions.appendChild(prompt);
+                    toast(reply.message);
+
+                    prompt.querySelector('[data-no]').addEventListener('click', function () { removeRow(row); });
+                    prompt.querySelector('[data-yes]').addEventListener('click', function () {
+                        prompt.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+                        send(form, { op: 'remind', preset: reply.suggest.preset }).then(function (set) {
+                            toast(set.message, !set.ok);
+                            removeRow(row);
+                        });
+                    });
+                    return;
+                }
+
+                toast(reply.message);
+                removeRow(row);
+            }).catch(function () {
+                toast('Could not reach Prospector — check your connection.', true);
+                row.querySelectorAll('.q-btn').forEach(function (b) { b.disabled = false; });
+            });
+        });
+
+        dash.querySelectorAll('[data-more]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                button.closest('[data-section]').classList.add('is-open');
+                button.remove();
+            });
+        });
+    }
+
     // ---- digging takes 20-40s, so say so rather than looking dead --------
     var digForm = document.querySelector('[data-dig-form]');
     if (digForm) {

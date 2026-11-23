@@ -171,7 +171,7 @@ $active = static function (string $path) use ($currentPath): bool {
                     <a class="pill pill-followup" href="<?= View::e(View::url('leads', ['due' => '1'])) ?>"
                        title="Follow-up reminders that have come due">
                         <?php $name = 'clock'; $size = 13; require __DIR__ . '/partials/icon.php'; ?>
-                        <?= (int) $followUps ?> follow-up<?= $followUps === 1 ? '' : 's' ?> due
+                        <?= (int) $followUps ?><span class="pill-long"> follow-up<?= $followUps === 1 ? '' : 's' ?></span> due
                     </a>
                 <?php endif; ?>
                 <span class="pill hide-narrow" title="Daily batches are delivered on this schedule">
