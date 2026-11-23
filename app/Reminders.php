@@ -91,6 +91,92 @@ final class Reminders
         ];
     }
 
+    /**
+     * When to follow up after each kind of action, in working days.
+     *
+     * The rhythm of an ordinary sales cadence: a voicemail wants a second try
+     * in a couple of days, an email a little longer to be read, a meeting the
+     * best part of a week to have been thought about.
+     */
+    private const FOLLOW_UP_DAYS = [
+        'called' => 2,
+        'voicemail' => 2,
+        'texted' => 2,
+        'emailed' => 3,
+        'proposal' => 3,
+        'linkedin' => 4,
+        'met' => 5,
+    ];
+
+    /**
+     * The follow-up to offer after an action has been logged — "Follow up
+     * Thursday?" — or null for an action that does not call for one.
+     *
+     * @return array{label: string, date: string, time: string, days: int}|null
+     */
+    public static function followUpFor(string $action, ?DateTimeImmutable $now = null): ?array
+    {
+        $days = self::FOLLOW_UP_DAYS[$action] ?? null;
+
+        if ($days === null) {
+            return null;
+        }
+
+        $now ??= Clock::local();
+        $day = $now;
+
+        for ($added = 0; $added < $days;) {
+            $day = $day->modify('+1 day');
+            if ((int) $day->format('N') < 6) {
+                $added++;
+            }
+        }
+
+        // A weekday name is enough within the coming week; past that it needs
+        // the date, or "Monday" is ambiguous.
+        $within = (int) $now->diff($day)->format('%a') < 6;
+
+        return [
+            'label' => ($within ? $day->format('l') : $day->format('D M j')) . ', 9am',
+            'date' => $day->format('Y-m-d'),
+            'time' => '09:00',
+            'days' => $days,
+        ];
+    }
+
+    /**
+     * Push a reminder back by a number of working days from now, at 9am.
+     *
+     * "Not today" on a due follow-up: it leaves the queue and comes back,
+     * rather than being ticked off and forgotten.
+     */
+    public static function snooze(int $id, int $workingDays = 2): ?string
+    {
+        $day = Clock::local();
+
+        for ($added = 0; $added < $workingDays;) {
+            $day = $day->modify('+1 day');
+            if ((int) $day->format('N') < 6) {
+                $added++;
+            }
+        }
+
+        $due = self::fromLocal($day->format('Y-m-d'), '09:00');
+
+        if ($due === null) {
+            return null;
+        }
+
+        // Unsent again, so the new time is emailed too.
+        Database::run(
+            'UPDATE reminders SET due_at = :due, sent_at = NULL, attempts = 0, error = NULL
+             WHERE id = :id AND done_at IS NULL',
+            ['due' => $due, 'id' => $id]
+        );
+
+        return $due;
+    }
+
     /** @return int the new reminder's id, or 0 when the time does not make sense */
     public static function create(int $leadId, int $userId, string $dueAtUtc, string $note = ''): int
     {

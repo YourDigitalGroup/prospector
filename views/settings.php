@@ -332,6 +332,15 @@ $secretSet = static fn (string $key): bool => Settings::hasSecret($key);
                         </div>
                     </div>
 
+                    <div class="field">
+                        <label for="weekly_touch_goal">Weekly touch goal, per seller</label>
+                        <input type="number" id="weekly_touch_goal" name="weekly_touch_goal" min="1" max="500"
+                               style="max-width: 9rem"
+                               value="<?= View::e($settings['weekly_touch_goal'] ?? '25') ?>">
+                        <div class="hint">Calls, emails and texts each seller aims for in a week — the ring on Home.
+                            The team view adds them up.</div>
+                    </div>
+
                     <div class="alert alert-info mt">
                         <?php $name = 'clock'; $size = 16; require __DIR__ . '/partials/icon.php'; ?>
                         <div>Currently delivering at <strong><?= View::e($scheduleText) ?></strong>.</div>

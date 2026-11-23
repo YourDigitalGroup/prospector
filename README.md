@@ -251,6 +251,50 @@ of the screen once something is selected — it sits above the list, so otherwis
 you would tick six leads, scroll back up past all of them, and only then choose
 an action.
 
+## Home: the sales dashboard
+
+Home is organised around the work rather than the batches: who to contact next, and how the week is
+going. It is built entirely from what people log — actions, statuses and follow-up reminders — so it
+fills itself in as the work is done. A seller sees their own leads and follow-ups; an admin sees the
+team, or one seller from the picker in the header.
+
+**Who to contact next** is one list in four sections, most urgent first. A lead appears once, in the
+most urgent section it qualifies for:
+
+1. **Follow-ups due** — reminders that have come round.
+2. **Reached out, nothing since** — a call, voicemail, email, text, LinkedIn message or proposal two
+   or more days ago, with no follow-up set and nothing logged since.
+3. **Going cold** — in play (contacted, no answer, or a booked meeting) with nothing for ten days.
+   A called-then-ignored lead moves here from section 2 rather than dropping off the list.
+4. **Fresh and untouched** — never worked, best fit first. A lead that has ever had a follow-up set
+   is not "untouched", even if nothing was logged against it.
+
+Anything with an open follow-up is left to that follow-up — due now, or on the strip below — so the
+queue never nags about something already scheduled. Signed, not interested, disqualified and
+archived leads are never in it.
+
+Each row has tap-to-call and **Called / VM / Emailed** buttons, plus **Snooze** (two working days on)
+and **Done** on a due follow-up. They work without leaving the page: the row offers the natural next
+follow-up — *Follow up Thursday, 9am?* — and slides away once answered, while the week's numbers move.
+Without JavaScript they are ordinary forms that post and come back.
+
+The follow-up offered depends on what was done, in working days at 9am: a call, voicemail or text
+two, an email or proposal three, a LinkedIn message four, a meeting five. Logging an action on a
+lead's own page offers the same, as one tap. Logging an action on a due follow-up completes it.
+
+**This week** — touches against a weekly goal (the ring, 25 per seller by default, set under
+Settings; the team view adds them up), touches per day, and calls, emails, meetings booked and deals
+signed against last week. Weeks run Monday to Sunday, Central. A touch is any logged action or any
+email or text sent from Prospector; notes and status changes are not.
+
+**Next 7 days** shows scheduled follow-ups a day at a time. **Pipeline** shows leads → reached out →
+meeting → signed with the rate between each step, each linking to those leads; disqualified leads
+are left out.
+
+Numbers count up and bars draw themselves in, but every entrance is CSS that ends on the real value,
+so the page is complete without JavaScript, and nothing moves for anyone whose device asks for
+reduced motion. Today's batches, with the **Run now** buttons, sit at the bottom.
+
 ## Filters stay put
 
 Whatever you set in the filter panel on the leads list — vertical, status, buyer door, score, owner,
@@ -980,6 +1024,7 @@ app/
   Notices.php          unopened batches, and how to describe them
   Verticals.php        free-text verticals filed under one heading per loop
   Reminders.php        follow-up reminders: setting, the due list, and sending them
+  Dashboard.php        Home: the queue, the week, the next seven days, the funnel
   Attachment.php       uploaded files, and the URLs GoHighLevel fetches them by
   Signature.php        the per-user sign-off, its logo upload and its HTML
   LocalModel.php       the OpenAI-compatible client for a local model server
@@ -1024,9 +1069,11 @@ php tests/reminders.php         # reminder timing, sending, de-duplication, "con
 php tests/lead_edit.php         # editing a lead: clearing, renaming, duplicates, who may
 php tests/anthropic_key.php     # a refused API key: checking, trimming, holding the schedule
 php tests/mailgun.php           # sending through Mailgun, against a stand-in for its API
+php tests/dashboard.php         # what Home is built from: the queue, the week, the funnel
 node tests/bulk_bar.js          # the bulk bar in a real browser (needs: npm install --no-save playwright)
 node tests/sticky_filters.js    # filters that survive leaving the page, until cleared
 node tests/followups.js         # reminders, Show contacted and sticky verticals, as Darren
+node tests/home.js              # Home worked like a seller works it, phone and reduced motion included
 ```
 
 `bulk_bar.js` is the odd one out, in JavaScript, because what it guards against lived in

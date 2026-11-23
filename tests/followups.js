@@ -193,7 +193,8 @@ const reminderRow = (lead) => JSON.parse(php(
   await page.reload();
   await page.waitForLoadState('networkidle');
   const pill = page.locator('.pill-followup');
-  check((await pill.innerText().catch(() => '')).includes('1 follow-up due'), 'once due, the top bar says so');
+  const pillText = (await pill.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+  check(pillText.includes('1 follow-up due'), `once due, the top bar says so — "${pillText}"`);
 
   await Promise.all([page.waitForNavigation(), pill.click()]);
   await page.waitForLoadState('networkidle');

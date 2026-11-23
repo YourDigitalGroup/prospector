@@ -413,6 +413,21 @@ if (!empty($lead['evidence'])) {
         <div class="card" id="reminders">
             <div class="card-head"><h2>Remind me to follow up</h2></div>
             <div class="card-body">
+                <?php
+                // Just logged an action: offer the follow-up it usually calls for,
+                // as one tap, while it is front of mind.
+                $justLogged = (string) ($_GET['followup'] ?? '');
+                $suggestion = $justLogged !== '' ? \Prospector\Reminders::followUpFor($justLogged) : null;
+                ?>
+                <?php if ($suggestion !== null && $reminders === []): ?>
+                    <form method="post" action="<?= View::e(View::url(ltrim($leadUrl, '/') . '/remind')) ?>" class="followup-prompt">
+                        <input type="hidden" name="csrf" value="<?= View::e($csrf) ?>">
+                        <input type="hidden" name="return" value="<?= View::e($leadUrl) ?>#reminders">
+                        <span>Follow up <strong><?= View::e($suggestion['label']) ?></strong>?</span>
+                        <button type="submit" class="btn btn-sm btn-primary" name="preset" value="follow:<?= View::e($justLogged) ?>">Yes, remind me</button>
+                        <a class="btn btn-sm btn-ghost" href="<?= View::e(View::url(ltrim($leadUrl, '/'))) ?>">Not now</a>
+                    </form>
+                <?php endif; ?>
                 <?php if ($reminders !== []): ?>
                     <ul class="reminder-list">
                         <?php foreach ($reminders as $reminder): ?>

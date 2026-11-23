@@ -944,7 +944,17 @@ final class Leads
         if ($note !== null && $note !== '') {
             $body .= ' — ' . $note;
         }
-        self::addActivity($leadId, $actorId, 'status', $body);
+        // The status goes in the action column as well as the sentence, so the
+        // dashboard can count "meetings booked this week" without reading
+        // English back out of the timeline.
+        Database::insert('activities', [
+            'lead_id' => $leadId,
+            'user_id' => $actorId,
+            'type' => 'status',
+            'action' => 'status:' . $status,
+            'body' => mb_substr($body, 0, 4000),
+            'created_at' => Clock::now(),
+        ]);
 
         // A disposition is the most useful automation trigger there is —
         // "booked a meeting" should be able to start a sequence on its own.

@@ -52,6 +52,7 @@ final class Settings
         'run_weekdays_only' => '',
         'batch_size' => '',
         'min_fit_score' => '',
+        'weekly_touch_goal' => '25',
         'effort' => 'high',
         // The local model server. Account-wide rather than per user: it is one
         // machine on one network, and four copies of the address is four ways

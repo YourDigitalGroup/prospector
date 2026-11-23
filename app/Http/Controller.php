@@ -24,6 +24,7 @@ use Prospector\Prospector;
 use Prospector\Runs;
 use Prospector\Support\Background;
 use Prospector\Support\Clock;
+use Prospector\Support\Database;
 use Prospector\Support\Request;
 use Prospector\Support\Settings;
 use Prospector\Support\View;
@@ -81,21 +82,13 @@ final class Controller
     {
         self::requireLogin();
 
+        // A seller sees their own; an admin the team, or one seller by ?owner=.
         $scope = self::scopeUserId();
-        $stats = Leads::stats($scope);
-        $recent = Leads::search(['user_id' => $scope, 'sort' => 'newest'], 8);
-        $priority = Leads::search(
-            ['user_id' => $scope, 'status' => 'new', 'sort' => 'score'],
-            6
-        );
 
         $todaysRuns = [];
         $users = Auth::isAdmin() ? Users::all(true) : [Auth::user()];
         foreach ($users as $user) {
-            if ($user === null) {
-                continue;
-            }
-            if ((string) $user['loop'] === 'none') {
+            if ($user === null || !Users::isRunnableLoop((string) $user['loop'])) {
                 continue;
             }
             $todaysRuns[] = [
@@ -106,15 +99,103 @@ final class Controller
 
         View::page('dashboard', [
             'title' => 'Home',
-            'stats' => $stats,
-            'recent' => $recent,
-            'priority' => $priority,
+            // Not "scope": the view renderer uses that name for its own
+            // variables, and the page would silently get those instead.
+            'scopeUser' => $scope,
+            'queue' => \Prospector\Dashboard::queue($scope),
+            'board' => \Prospector\Dashboard::scoreboard($scope),
+            'upcoming' => \Prospector\Dashboard::upcoming($scope),
+            'funnel' => \Prospector\Dashboard::funnel($scope),
+            'owners' => Auth::isAdmin() ? array_values(array_filter(
+                Users::all(true),
+                static fn (array $u): bool => Users::isRunnableLoop((string) $u['loop'])
+            )) : [],
             'todaysRuns' => $todaysRuns,
-            'volume' => Leads::dailyVolume($scope, 14),
-            'runs' => Runs::recent($scope, 5),
             'scheduleText' => Mailer::scheduleDescription(),
             'digest' => \Prospector\Notices::digest($scope),
         ]);
+    }
+
+    /**
+     * The queue's inline buttons: log an action, set the suggested follow-up,
+     * snooze a due one, or mark it done — without leaving Home.
+     *
+     * Answers the page's script with JSON, including the week's numbers so the
+     * scoreboard can move as the work is done. Without JavaScript the buttons
+     * are ordinary forms, and this redirects back with a message instead.
+     */
+    public static function dashboardAct(): void
+    {
+        self::requireLogin();
+        self::requireCsrf();
+
+        $wantsJson = str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+        $reply = static function (bool $ok, string $message, array $extra = []) use ($wantsJson): never {
+            if ($wantsJson) {
+                header('Content-Type: application/json');
+                http_response_code($ok ? 200 : 422);
+                echo json_encode(['ok' => $ok, 'message' => $message] + $extra);
+                exit;
+            }
+            self::flash($ok ? 'success' : 'error', $message);
+            self::redirect('/dashboard');
+        };
+
+        $lead = Leads::find(Request::int('lead_id'));
+        if ($lead === null || !Auth::canAccessUser((int) $lead['user_id'])) {
+            $reply(false, 'That lead could not be found.');
+        }
+
+        $leadId = (int) $lead['id'];
+        $actorId = (int) Auth::id();
+        $op = Request::input('op');
+
+        // Anything acting on a reminder may only touch a reminder on this lead,
+        // and only one the person set unless they are an admin.
+        $reminder = null;
+        if (in_array($op, ['snooze', 'done'], true)) {
+            $reminder = Reminders::find(Request::int('reminder_id'));
+            if ($reminder === null || (int) $reminder['lead_id'] !== $leadId
+                || ((int) $reminder['user_id'] !== $actorId && !Auth::isAdmin())) {
+                $reply(false, 'That follow-up could not be found.');
+            }
+        }
+
+        $scope = self::scopeUserId();
+        $score = static fn (): array => \Prospector\Dashboard::scoreboard($scope);
+
+        switch ($op) {
+            case 'log':
+                $action = Request::input('log_action');
+                if (!Leads::logAction($leadId, $action, null, $actorId)) {
+                    $reply(false, 'Pick what you did first.');
+                }
+                $suggest = Reminders::followUpFor($action);
+                $reply(true, Leads::actionLabel($action) . ' — logged for ' . (string) $lead['company'] . '.', [
+                    'suggest' => $suggest === null ? null : ['label' => $suggest['label'], 'preset' => 'follow:' . $action],
+                    'score' => $score(),
+                ]);
+
+            case 'remind':
+                $preset = Request::input('preset');
+                $follow = str_starts_with($preset, 'follow:') ? Reminders::followUpFor(substr($preset, 7)) : null;
+                $due = $follow !== null ? Reminders::fromLocal($follow['date'], $follow['time']) : null;
+                if ($due === null) {
+                    $reply(false, 'That follow-up time did not make sense.');
+                }
+                Reminders::create($leadId, $actorId, $due);
+                $reply(true, 'Follow-up set for ' . Clock::display($due, 'l \\a\\t g:ia') . '.', ['score' => $score()]);
+
+            case 'snooze':
+                $due = Reminders::snooze((int) $reminder['id'], 2);
+                $reply(true, 'Moved to ' . Clock::display((string) $due, 'l \\a\\t g:ia') . '.', ['score' => $score()]);
+
+            case 'done':
+                Reminders::done((int) $reminder['id']);
+                $reply(true, 'Follow-up done.', ['score' => $score()]);
+        }
+
+        $reply(false, 'Nothing to do.');
     }
 
     // --------------------------------------------------------------- leads
@@ -380,6 +461,16 @@ final class Controller
                 $logged = Request::input('log_action');
                 if (Leads::logAction($id, $logged, Request::input('log_note'), Auth::id())) {
                     self::flash('success', Leads::actionLabel($logged) . ' — logged.');
+
+                    // Offer the next follow-up while it is front of mind — unless
+                    // one is already waiting, in which case the plan exists.
+                    $waiting = (int) Database::scalar(
+                        'SELECT COUNT(*) FROM reminders WHERE lead_id = :id AND user_id = :uid AND done_at IS NULL',
+                        ['id' => $id, 'uid' => (int) Auth::id()]
+                    );
+                    if ($waiting === 0 && Reminders::followUpFor($logged) !== null) {
+                        self::redirect('/leads/' . $id . '?followup=' . rawurlencode($logged) . '#reminders');
+                    }
                 } else {
                     self::flash('error', 'Pick what you did first.');
                 }
@@ -391,6 +482,10 @@ final class Controller
                 // mean today for anyone who left the lead open overnight. The
                 // custom row carries what was typed. Both are business time.
                 $preset = Reminders::presets()[Request::input('preset')] ?? null;
+                // The suggestion offered after logging an action: "follow:called".
+                if ($preset === null && str_starts_with(Request::input('preset'), 'follow:')) {
+                    $preset = Reminders::followUpFor(substr(Request::input('preset'), 7));
+                }
                 $dueAt = $preset !== null
                     ? Reminders::fromLocal($preset['date'], $preset['time'])
                     : Reminders::fromLocal(Request::input('remind_date'), Request::input('remind_time'));
@@ -1712,6 +1807,7 @@ final class Controller
             'run_weekdays_only' => Request::bool('run_weekdays_only') ? '1' : '0',
             'batch_size' => (string) max(1, min(25, Request::int('batch_size', 10))),
             'min_fit_score' => (string) max(0, min(100, Request::int('min_fit_score', 70))),
+            'weekly_touch_goal' => (string) max(1, min(500, Request::int('weekly_touch_goal', 25))),
             'effort' => in_array(Request::input('effort'), ['low', 'medium', 'high', 'xhigh', 'max'], true)
                 ? Request::input('effort')
                 : 'high',
